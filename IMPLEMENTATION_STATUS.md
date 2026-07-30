@@ -45,12 +45,12 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 
 ## Phase 3 — Deterministic processing, extraction, validation, and review
 
-- [ ] Implement the deterministic LangGraph workflow, processing lock, retry taxonomy, atomic finalization, and failure persistence.
-- [ ] Parse PDFs with PyMuPDF while preserving page boundaries and Arabic text.
-- [ ] Implement language detection, document classification, schema selection, normalization, prompt-injection detection, and security events.
-- [ ] Implement `GeminiProvider` and deterministic `FakeAIProvider` for classification, structured extraction, embeddings, and grounded responses.
-- [ ] Implement invoice, quotation, purchase-order, and contract schemas with page citations and field confidence.
-- [ ] Implement arithmetic, date, currency, identifier, confidence, and contract validation rules.
+- [~] Implement the deterministic LangGraph workflow, processing lock, retry taxonomy, atomic finalization, and failure persistence. The provider-neutral graph is implemented; worker locking and persistent finalization remain.
+- [x] Parse PDFs with PyMuPDF while preserving page boundaries and Arabic text.
+- [~] Implement language detection, document classification, schema selection, normalization, prompt-injection detection, and security events. Deterministic analysis is implemented; security-event persistence in the worker remains.
+- [~] Implement `GeminiProvider` and deterministic `FakeAIProvider` for classification, structured extraction, embeddings, and grounded responses. The 768-dimension fake provider is complete; Gemini remains externally blocked and unimplemented.
+- [~] Implement invoice, quotation, purchase-order, and contract schemas with page citations and field confidence. A versioned common schema and required-field profiles exist; full type-specific field breadth remains.
+- [~] Implement arithmetic, date, currency, identifier, confidence, and contract validation rules. Required-field, confidence, and total arithmetic checks exist; remaining rule families remain.
 - [ ] Implement extraction correction, revision history, approval rules, and audit events.
 - [ ] Cover idempotency, retries, provider failures, Arabic preservation, and legal transitions with tests.
 
@@ -138,3 +138,4 @@ Only real results belong here.
 | 2026-07-30 | Alembic schema             | Passed: clean downgrade/upgrade, pgvector initialization, and `alembic check` with no drift.                                                  |
 | 2026-07-30 | Authenticated upload tests | Passed: 3 PostgreSQL integration journeys covering idempotency, PDF validation, completion/queueing, and cross-workspace denial.              |
 | 2026-07-30 | Backend tests (Phase 2)    | Passed: 25 tests total with strict Ruff and mypy checks; one upstream TestClient deprecation warning remains.                                |
+| 2026-07-30 | Phase 3 domain tests       | Passed: 20 document-intelligence tests covering page boundaries, bilingual detection, citations, arithmetic mismatch, injection signals, and 768-dimension embeddings. |

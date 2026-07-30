@@ -2,7 +2,7 @@
 
 GulfDocs is a bilingual Arabic–English document-intelligence platform that extracts structured business data, validates financial and contractual fields, supports human review, and answers questions with page-level evidence.
 
-This repository is under active phased development. Phase 1 is complete, and Phase 2 now includes the core PostgreSQL/pgvector schema, Alembic migrations, Firebase and deterministic development authentication boundaries, persistent workspace authorization, capability-token PDF uploads, and Cloud Storage/Cloud Tasks adapters. Full document processing, review, retrieval, cloud verification, and deployment are tracked in [`IMPLEMENTATION_STATUS.md`](./IMPLEMENTATION_STATUS.md).
+This repository is under active phased development. Phases 1 and 2 are complete: the project includes the core PostgreSQL/pgvector schema, Alembic migrations, Firebase and deterministic development authentication boundaries, persistent workspace authorization, the full document upload lifecycle, and Cloud Storage/Cloud Tasks adapters. Phase 3’s provider-neutral parsing, bilingual analysis, versioned extraction, validation, and LangGraph core are underway. Persistent worker orchestration, review, retrieval, cloud verification, and deployment are tracked in [`IMPLEMENTATION_STATUS.md`](./IMPLEMENTATION_STATUS.md).
 
 > Public data is synthetic. Anonymous uploads are disabled. Do not use the project with confidential, personal, legally sensitive, or commercially sensitive material when it is configured with a free AI API tier.
 
