@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import fitz
+import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from gulfdocs_api.config import get_settings
@@ -64,6 +65,10 @@ def _presign(client: TestClient, subject: str, content: bytes, key: str) -> dict
     return response.json()
 
 
+def _sync_database_url() -> str:
+    return get_settings().database_url.replace("postgresql+psycopg://", "postgresql://")
+
+
 def test_upload_completion_and_workspace_isolation(client: TestClient) -> None:
     content = _pdf_bytes()
     presigned = _presign(client, "alice", content, "alice-upload-001")
@@ -83,6 +88,13 @@ def test_upload_completion_and_workspace_isolation(client: TestClient) -> None:
     assert complete.json()["status"] == "queued"
     assert complete.json()["page_count"] == 1
 
+    download = client.get(
+        f"/api/v1/documents/{presigned['document_id']}/download",
+        headers={"Authorization": "Bearer dev:alice"},
+    )
+    assert download.status_code == 200
+    assert download.content == content
+
     visible = client.get(
         f"/api/v1/documents/{presigned['document_id']}",
         headers={"Authorization": "Bearer dev:alice"},
@@ -93,6 +105,22 @@ def test_upload_completion_and_workspace_isolation(client: TestClient) -> None:
     )
     assert visible.status_code == 200
     assert hidden.status_code == 404
+
+    hidden_delete = client.delete(
+        f"/api/v1/documents/{presigned['document_id']}",
+        headers={"Authorization": "Bearer dev:bob"},
+    )
+    deleted = client.delete(
+        f"/api/v1/documents/{presigned['document_id']}",
+        headers={"Authorization": "Bearer dev:alice"},
+    )
+    after_delete = client.get(
+        f"/api/v1/documents/{presigned['document_id']}",
+        headers={"Authorization": "Bearer dev:alice"},
+    )
+    assert hidden_delete.status_code == 404
+    assert deleted.status_code == 204
+    assert after_delete.status_code == 404
 
 
 def test_presign_is_idempotent(client: TestClient) -> None:
@@ -119,3 +147,65 @@ def test_pdf_magic_is_checked_at_completion(client: TestClient) -> None:
     )
     assert complete.status_code == 422
     assert complete.json()["detail"] == "File signature is not a PDF"
+
+
+def test_only_failed_documents_can_be_retried(client: TestClient) -> None:
+    content = _pdf_bytes()
+    presigned = _presign(client, "alice", content, "alice-upload-004")
+    client.put(
+        str(presigned["upload_url"]),
+        headers={"Content-Type": "application/pdf"},
+        content=content,
+    )
+    client.post(
+        "/api/v1/uploads/complete",
+        headers={"Authorization": "Bearer dev:alice"},
+        json={"document_id": presigned["document_id"]},
+    )
+    premature = client.post(
+        f"/api/v1/documents/{presigned['document_id']}/retry",
+        headers={"Authorization": "Bearer dev:alice"},
+    )
+    assert premature.status_code == 409
+
+    with psycopg.connect(_sync_database_url()) as connection:
+        connection.execute(
+            "UPDATE documents SET status = 'failed' WHERE id = %s",
+            (presigned["document_id"],),
+        )
+    retried = client.post(
+        f"/api/v1/documents/{presigned['document_id']}/retry",
+        headers={"Authorization": "Bearer dev:alice"},
+    )
+    assert retried.status_code == 200
+    assert retried.json()["status"] == "queued"
+    with psycopg.connect(_sync_database_url()) as connection:
+        attempts = connection.execute(
+            "SELECT count(*) FROM document_processing_runs WHERE document_id = %s",
+            (presigned["document_id"],),
+        ).fetchone()
+    assert attempts is not None and attempts[0] == 2
+
+
+def test_daily_upload_limit_is_enforced(client: TestClient) -> None:
+    settings = get_settings()
+    original_limit = settings.max_uploads_per_user_per_day
+    settings.max_uploads_per_user_per_day = 1
+    try:
+        content = _pdf_bytes()
+        _presign(client, "alice", content, "alice-limit-001")
+        blocked = client.post(
+            "/api/v1/uploads/presign",
+            headers={
+                "Authorization": "Bearer dev:alice",
+                "Idempotency-Key": "alice-limit-002",
+            },
+            json={
+                "filename": "invoice.pdf",
+                "size_bytes": len(content),
+                "content_type": "application/pdf",
+            },
+        )
+    finally:
+        settings.max_uploads_per_user_per_day = original_limit
+    assert blocked.status_code == 429

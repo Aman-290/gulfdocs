@@ -26,6 +26,10 @@ logger = structlog.get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    if settings.app_env not in {"development", "test"} and (
+        settings.storage_provider == "local" or settings.task_queue_provider == "inline"
+    ):
+        raise RuntimeError("Local storage and inline queues are forbidden outside development/test")
     engine = create_engine(settings.database_url)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)

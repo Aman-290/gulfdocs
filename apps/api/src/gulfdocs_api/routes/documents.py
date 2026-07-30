@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 import anyio
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse, RedirectResponse
 from gulfdocs_document_intelligence.adapters.local import LocalFileStorage
 from gulfdocs_document_intelligence.models import DocumentStatus
 from gulfdocs_document_intelligence.repositories import DocumentRecord
@@ -227,14 +228,111 @@ async def complete_upload(
         )
         if queued is not None:
             document = queued
-            queue = _cloud_queue(settings)
-            task_id = await queue.enqueue_document(document.id, request.state.request_id)
-            await repository.create_processing_run(
+            processing_run = await repository.create_processing_run(
                 document_id=document.id,
-                task_id=task_id,
                 correlation_id=request.state.request_id,
             )
+            await context.session.commit()
+            queue = _cloud_queue(settings)
+            task_id = await queue.enqueue_document(
+                document.id,
+                processing_run.id,
+                request.state.request_id,
+                processing_run.attempt,
+            )
+            await repository.attach_processing_task(processing_run.id, task_id)
     return _response(document)
+
+
+@router.get("/documents/{document_id}/download", response_class=Response, response_model=None)
+async def download_document(
+    document_id: UUID, context: Authorized
+) -> FileResponse | RedirectResponse:
+    settings = get_settings()
+    document = await SqlAlchemyDocumentRepository(context.session).get_for_workspace(
+        context.identity.workspace_id, document_id
+    )
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document was not found")
+    if not document.storage_key:
+        raise HTTPException(status_code=409, detail="Document upload is not complete")
+    if settings.storage_provider == "local":
+        try:
+            path = await LocalFileStorage(Path(settings.local_storage_root)).get(
+                document.storage_key
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="Document content was not found") from exc
+        return FileResponse(path, media_type="application/pdf", filename=document.filename)
+    if settings.storage_provider == "gcs":
+        expires_at = datetime.now(UTC) + timedelta(seconds=settings.upload_url_ttl_seconds)
+        url = await GcsSignedUploadAdapter(settings.gcs_bucket).create_download_url(
+            document.storage_key, expires_at
+        )
+        return RedirectResponse(url, status_code=307)
+    raise RuntimeError(f"Unsupported storage provider: {settings.storage_provider}")
+
+
+@router.delete("/documents/{document_id}", status_code=204)
+async def delete_document(document_id: UUID, request: Request, context: Authorized) -> Response:
+    settings = get_settings()
+    repository = SqlAlchemyDocumentRepository(context.session)
+    document = await repository.get_for_workspace(context.identity.workspace_id, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document was not found")
+    try:
+        deleted = await repository.transition(
+            identity=context.identity,
+            document_id=document_id,
+            target=DocumentStatus.DELETED,
+            request_id=request.state.request_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409, detail="Document cannot be deleted while processing"
+        ) from exc
+    if deleted is None:
+        raise HTTPException(status_code=404, detail="Document was not found")
+    if document.storage_key:
+        if settings.storage_provider == "local":
+            await LocalFileStorage(Path(settings.local_storage_root)).delete(document.storage_key)
+        elif settings.storage_provider == "gcs":
+            await GcsSignedUploadAdapter(settings.gcs_bucket).delete(document.storage_key)
+    return Response(status_code=204)
+
+
+@router.post("/documents/{document_id}/retry", response_model=DocumentResponse)
+async def retry_document(
+    document_id: UUID, request: Request, context: Authorized
+) -> DocumentResponse:
+    settings = get_settings()
+    repository = SqlAlchemyDocumentRepository(context.session)
+    document = await repository.get_for_workspace(context.identity.workspace_id, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document was not found")
+    if document.status is not DocumentStatus.FAILED:
+        raise HTTPException(status_code=409, detail="Only failed documents can be retried")
+    queued = await repository.transition(
+        identity=context.identity,
+        document_id=document_id,
+        target=DocumentStatus.QUEUED,
+        request_id=request.state.request_id,
+    )
+    if queued is None:
+        raise HTTPException(status_code=404, detail="Document was not found")
+    processing_run = await repository.create_processing_run(
+        document_id=document_id,
+        correlation_id=request.state.request_id,
+    )
+    await context.session.commit()
+    task_id = await _cloud_queue(settings).enqueue_document(
+        document_id,
+        processing_run.id,
+        request.state.request_id,
+        processing_run.attempt,
+    )
+    await repository.attach_processing_task(processing_run.id, task_id)
+    return _response(queued)
 
 
 @router.get("/documents", response_model=list[DocumentResponse])

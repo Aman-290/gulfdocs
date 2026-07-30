@@ -16,4 +16,10 @@ TaskHandler = Callable[[UUID, str], Awaitable[None]]
 
 
 class TaskQueuePort(Protocol):
-    async def enqueue_document(self, document_id: UUID, correlation_id: str) -> str: ...
+    async def enqueue_document(
+        self,
+        document_id: UUID,
+        processing_run_id: UUID,
+        correlation_id: str,
+        attempt: int,
+    ) -> str: ...

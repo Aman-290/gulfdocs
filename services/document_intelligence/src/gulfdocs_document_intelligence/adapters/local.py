@@ -38,7 +38,14 @@ class InlineTaskQueue:
     def __init__(self, handler: TaskHandler) -> None:
         self.handler = handler
 
-    async def enqueue_document(self, document_id: UUID, correlation_id: str) -> str:
+    async def enqueue_document(
+        self,
+        document_id: UUID,
+        processing_run_id: UUID,
+        correlation_id: str,
+        attempt: int,
+    ) -> str:
+        del processing_run_id, attempt
         task_id = f"inline-{uuid4()}"
         await self.handler(document_id, correlation_id)
         return task_id

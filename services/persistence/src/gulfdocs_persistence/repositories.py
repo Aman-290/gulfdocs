@@ -4,7 +4,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 from gulfdocs_document_intelligence.models import DocumentStatus
 from gulfdocs_document_intelligence.repositories import AuthIdentity, DocumentRecord
 from gulfdocs_document_intelligence.status_machine import require_legal_transition
-from sqlalchemy import Select, and_, select
+from sqlalchemy import Select, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import (
@@ -29,6 +29,7 @@ def _document_record(document: Document) -> DocumentRecord:
         size_bytes=document.size_bytes,
         page_count=document.page_count,
         content_type=document.content_type,
+        storage_key=document.storage_key,
         created_at=document.created_at,
         updated_at=document.updated_at,
     )
@@ -280,25 +281,30 @@ class SqlAlchemyDocumentRepository:
         return _document_record(document)
 
     async def create_processing_run(
-        self, *, document_id: UUID, task_id: str, correlation_id: str
-    ) -> None:
-        existing = await self.session.scalar(
-            select(DocumentProcessingRun).where(
-                DocumentProcessingRun.document_id == document_id,
-                DocumentProcessingRun.attempt == 1,
+        self, *, document_id: UUID, correlation_id: str
+    ) -> DocumentProcessingRun:
+        latest_attempt = await self.session.scalar(
+            select(func.max(DocumentProcessingRun.attempt)).where(
+                DocumentProcessingRun.document_id == document_id
             )
         )
-        if existing is not None:
-            return
-        self.session.add(
-            DocumentProcessingRun(
-                document_id=document_id,
-                task_id=task_id,
-                correlation_id=correlation_id,
-                status="queued",
-                attempt=1,
-            )
+        processing_run = DocumentProcessingRun(
+            document_id=document_id,
+            task_id=None,
+            correlation_id=correlation_id,
+            status="dispatching",
+            attempt=(latest_attempt or 0) + 1,
         )
+        self.session.add(processing_run)
+        await self.session.flush()
+        return processing_run
+
+    async def attach_processing_task(self, processing_run_id: UUID, task_id: str) -> None:
+        processing_run = await self.session.get(DocumentProcessingRun, processing_run_id)
+        if processing_run is None:
+            raise LookupError("Processing run was not found")
+        processing_run.task_id = task_id
+        processing_run.status = "queued"
         await self.session.flush()
 
     async def consume_upload_allowance(self, identity: AuthIdentity, maximum: int) -> bool:

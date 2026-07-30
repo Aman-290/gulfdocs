@@ -53,5 +53,5 @@ strict = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["fitz.*", "firebase_admin", "firebase_admin.*"]
+module = ["fitz.*", "firebase_admin"]
 ignore_missing_imports = true

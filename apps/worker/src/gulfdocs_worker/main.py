@@ -4,8 +4,11 @@ import sys
 from typing import Annotated
 from uuid import UUID
 
+import anyio
 import structlog
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+from google.auth.transport.requests import Request as GoogleAuthRequest
+from google.oauth2 import id_token
 from pydantic import BaseModel, Field
 
 from .config import WorkerSettings, get_worker_settings
@@ -55,15 +58,54 @@ async def require_worker_identity(
     worker_settings: Annotated[WorkerSettings, Depends(get_worker_settings)],
     authorization: Annotated[str | None, Header()] = None,
 ) -> None:
-    if worker_settings.worker_auth_mode != "development":
+    if worker_settings.worker_auth_mode == "development":
+        if worker_settings.app_env not in {"development", "test"}:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Development worker authentication is disabled",
+            )
+        expected = f"Bearer {worker_settings.worker_development_token}"
+        if authorization is None or not secrets.compare_digest(authorization, expected):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Worker authentication required",
+            )
+        return
+    if worker_settings.worker_auth_mode != "oidc":
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Cloud OIDC verification is not configured",
+            detail="Worker authentication is not configured",
         )
-    expected = f"Bearer {worker_settings.worker_development_token}"
-    if authorization is None or not secrets.compare_digest(authorization, expected):
+    if (
+        not worker_settings.worker_oidc_audience
+        or not worker_settings.worker_invoker_service_account
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Worker OIDC configuration is incomplete",
+        )
+    if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Worker authentication required"
+        )
+    token = authorization.removeprefix("Bearer ").strip()
+    try:
+        claims = await anyio.to_thread.run_sync(
+            lambda: id_token.verify_oauth2_token(  # type: ignore[no-untyped-call]
+                token,
+                GoogleAuthRequest(),
+                audience=worker_settings.worker_oidc_audience,
+            )
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Worker authentication required"
+        ) from exc
+    if claims.get("email") != worker_settings.worker_invoker_service_account or not claims.get(
+        "email_verified", False
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Worker invoker is not authorized"
         )
 
 

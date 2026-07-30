@@ -26,6 +26,7 @@ class DocumentRecord:
     size_bytes: int | None
     page_count: int | None
     content_type: str | None
+    storage_key: str | None
     created_at: datetime
     updated_at: datetime
 

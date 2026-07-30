@@ -39,9 +39,9 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 - [x] Implement Firebase ID-token verification and deterministic development-auth adapter.
 - [x] Enforce workspace authorization in API and repository queries with cross-workspace denial tests.
 - [x] Implement legal document status transitions and transactional upload idempotency.
-- [~] Implement local filesystem and Cloud Storage adapters with opaque object paths and signed-upload abstraction. Local behavior is tested; live GCS signing/download requires the blocked cloud configuration.
-- [~] Implement local queue and Cloud Tasks OIDC adapters with identifier-only payloads. Queue records are persisted locally; live task delivery requires the blocked cloud configuration.
-- [~] Implement presign/complete/download/delete/retry endpoints, PDF magic-byte checks, size/page limits, usage limits, polling states, and audit events. Presign, capability upload, completion, list/detail polling, limits, PDF validation, and audit events are implemented; download/delete/retry remain.
+- [x] Implement local filesystem and Cloud Storage adapters with opaque object paths and signed upload/download abstractions. Local behavior is tested; live GCS execution remains externally blocked.
+- [x] Implement local queue and Cloud Tasks OIDC adapters with identifier-only payloads, deterministic task IDs, persistent dispatch state, and fail-closed worker OIDC verification. Live delivery remains externally blocked.
+- [x] Implement presign/complete/download/delete/retry endpoints, PDF magic-byte checks, size/page limits, usage limits, polling states, and audit events.
 
 ## Phase 3 — Deterministic processing, extraction, validation, and review
 
@@ -137,4 +137,4 @@ Only real results belong here.
 | 2026-07-30 | Local smoke                | Passed: API health and seeded synthetic public-demo listing.                                                                                 |
 | 2026-07-30 | Alembic schema             | Passed: clean downgrade/upgrade, pgvector initialization, and `alembic check` with no drift.                                                  |
 | 2026-07-30 | Authenticated upload tests | Passed: 3 PostgreSQL integration journeys covering idempotency, PDF validation, completion/queueing, and cross-workspace denial.              |
-| 2026-07-30 | Backend tests (Phase 2)    | Passed: 22 tests total with strict Ruff and mypy checks; one upstream TestClient deprecation warning remains.                                |
+| 2026-07-30 | Backend tests (Phase 2)    | Passed: 25 tests total with strict Ruff and mypy checks; one upstream TestClient deprecation warning remains.                                |

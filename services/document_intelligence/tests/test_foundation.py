@@ -90,7 +90,7 @@ async def test_inline_queue_delivers_identifiers_and_correlation_id() -> None:
 
     document_id = uuid4()
     queue = InlineTaskQueue(handler)
-    task_id = await queue.enqueue_document(document_id, "correlation-123")
+    task_id = await queue.enqueue_document(document_id, uuid4(), "correlation-123", attempt=1)
 
     assert task_id.startswith("inline-")
     assert deliveries == [(document_id, "correlation-123")]

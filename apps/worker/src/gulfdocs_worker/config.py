@@ -10,6 +10,8 @@ class WorkerSettings(BaseSettings):
     log_level: str = "INFO"
     worker_auth_mode: str = "development"
     worker_development_token: str = "local-development-only"
+    worker_oidc_audience: str = ""
+    worker_invoker_service_account: str = ""
     max_processing_retries: int = 3
     max_worker_duration_seconds: int = 540
 
