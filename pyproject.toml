@@ -1,0 +1,49 @@
+[project]
+name = "gulfdocs-workspace"
+version = "0.1.0"
+requires-python = ">=3.12,<3.14"
+
+[tool.uv.workspace]
+members = [
+  "apps/api",
+  "apps/worker",
+  "services/document_intelligence",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28.1,<1",
+  "mypy>=1.17.1,<2",
+  "pytest>=8.4.1,<9",
+  "pytest-asyncio>=1.1.0,<2",
+  "pytest-cov>=6.2.1,<7",
+  "ruff>=0.12.7,<1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers --strict-config -ra"
+asyncio_mode = "auto"
+testpaths = [
+  "apps/api/tests",
+  "apps/worker/tests",
+  "services/document_intelligence/tests",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = ["fitz.*"]
+ignore_missing_imports = true

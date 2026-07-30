@@ -1,0 +1,14 @@
+# Firebase App Hosting runtime settings verified against the current official schema.
+runConfig:
+  minInstances: 0
+  maxInstances: 1
+  concurrency: 40
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  - variable: NEXT_PUBLIC_API_BASE_URL
+    value: https://replace-with-gulfdocs-api-url.example
+    availability:
+      - BUILD
+      - RUNTIME

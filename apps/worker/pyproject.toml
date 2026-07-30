@@ -1,0 +1,23 @@
+[project]
+name = "gulfdocs-worker"
+version = "0.1.0"
+description = "Private document-processing worker for GulfDocs"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "fastapi>=0.116.1,<1",
+  "google-auth>=2.40.3,<3",
+  "gulfdocs-document-intelligence",
+  "pydantic-settings>=2.10.1,<3",
+  "structlog>=25.4.0,<26",
+  "uvicorn[standard]>=0.35.0,<1",
+]
+
+[tool.uv.sources]
+gulfdocs-document-intelligence = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gulfdocs_worker"]
