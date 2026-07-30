@@ -33,15 +33,15 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 
 ## Phase 2 — Database, authentication, authorization, and upload lifecycle
 
-- [ ] Model users, organizations/workspaces, memberships, documents, uploads, processing runs, pages, chunks, extraction data, reviews, questions/answers, usage, audit, and security events.
-- [ ] Add PostgreSQL constraints, indexes, pgvector, full-text search, UTC timestamps, and Alembic migrations.
-- [ ] Verify empty-database initialization and repository integration tests.
-- [ ] Implement Firebase ID-token verification and deterministic development-auth adapter.
-- [ ] Enforce workspace authorization in API and repository queries with cross-workspace denial tests.
-- [ ] Implement legal document status transitions and transactional idempotency.
-- [ ] Implement local filesystem and Cloud Storage adapters with opaque object paths and signed-upload abstraction.
-- [ ] Implement local inline and Cloud Tasks queue adapters with identifier-only payloads.
-- [ ] Implement presign/complete/download/delete/retry endpoints, PDF magic-byte checks, size/page limits, usage limits, polling states, and audit events.
+- [x] Model users, organizations/workspaces, memberships, documents, uploads, processing runs, pages, chunks, extraction data, reviews, questions/answers, usage, audit, and security events.
+- [x] Add PostgreSQL constraints, indexes, pgvector, full-text search, UTC timestamps, and Alembic migrations.
+- [x] Verify empty-database initialization and repository integration tests.
+- [x] Implement Firebase ID-token verification and deterministic development-auth adapter.
+- [x] Enforce workspace authorization in API and repository queries with cross-workspace denial tests.
+- [x] Implement legal document status transitions and transactional upload idempotency.
+- [~] Implement local filesystem and Cloud Storage adapters with opaque object paths and signed-upload abstraction. Local behavior is tested; live GCS signing/download requires the blocked cloud configuration.
+- [~] Implement local queue and Cloud Tasks OIDC adapters with identifier-only payloads. Queue records are persisted locally; live task delivery requires the blocked cloud configuration.
+- [~] Implement presign/complete/download/delete/retry endpoints, PDF magic-byte checks, size/page limits, usage limits, polling states, and audit events. Presign, capability upload, completion, list/detail polling, limits, PDF validation, and audit events are implemented; download/delete/retry remain.
 
 ## Phase 3 — Deterministic processing, extraction, validation, and review
 
@@ -135,3 +135,6 @@ Only real results belong here.
 | 2026-07-30 | Container builds/runtime   | Passed: non-root API and worker images built; health checks, unauthenticated rejection, and authenticated task processing verified.          |
 | 2026-07-30 | PostgreSQL/pgvector        | Passed: PostgreSQL 17 container became healthy and pgvector 0.8.6 extension loaded; container stopped after verification.                    |
 | 2026-07-30 | Local smoke                | Passed: API health and seeded synthetic public-demo listing.                                                                                 |
+| 2026-07-30 | Alembic schema             | Passed: clean downgrade/upgrade, pgvector initialization, and `alembic check` with no drift.                                                  |
+| 2026-07-30 | Authenticated upload tests | Passed: 3 PostgreSQL integration journeys covering idempotency, PDF validation, completion/queueing, and cross-workspace denial.              |
+| 2026-07-30 | Backend tests (Phase 2)    | Passed: 22 tests total with strict Ruff and mypy checks; one upstream TestClient deprecation warning remains.                                |

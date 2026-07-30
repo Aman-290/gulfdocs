@@ -37,10 +37,10 @@ def test_unknown_question_returns_explicit_unsupported_answer() -> None:
     assert "could not find enough evidence" in response.json()["answer"]
 
 
-def test_anonymous_upload_endpoint_does_not_exist_in_phase_one() -> None:
+def test_anonymous_upload_endpoint_is_protected() -> None:
     with TestClient(app) as client:
         response = client.post("/api/v1/uploads/presign", json={"filename": "anything.pdf"})
-    assert response.status_code == 404
+    assert response.status_code == 401
     assert response.headers["content-type"].startswith("application/problem+json")
 
 

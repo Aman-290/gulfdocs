@@ -11,6 +11,7 @@ dependencies = [
   "google-cloud-storage>=3.2.0,<4",
   "google-cloud-tasks>=2.19.3,<3",
   "gulfdocs-document-intelligence",
+  "gulfdocs-persistence",
   "opentelemetry-api>=1.36.0,<2",
   "opentelemetry-instrumentation-fastapi>=0.57b0,<1",
   "pgvector>=0.4.1,<1",
@@ -23,6 +24,7 @@ dependencies = [
 
 [tool.uv.sources]
 gulfdocs-document-intelligence = { workspace = true }
+gulfdocs-persistence = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -25,10 +25,11 @@ db-down:
 	docker compose down
 
 migrate:
-	@echo "Alembic migrations are introduced in Phase 2."
+	uv run alembic upgrade head
 
 migration:
-	@echo "Alembic migrations are introduced in Phase 2."
+	@test -n "$(MESSAGE)" || (echo "MESSAGE is required" && exit 1)
+	uv run alembic revision --autogenerate -m "$(MESSAGE)"
 
 seed:
 	@echo "Database seed command is introduced in Phase 2; Phase 1 demo data is in-memory."
@@ -43,7 +44,7 @@ format:
 
 typecheck:
 	pnpm typecheck
-	uv run mypy apps/api/src apps/worker/src services/document_intelligence/src
+	uv run mypy apps/api/src apps/worker/src services/document_intelligence/src services/persistence/src
 
 test: test-unit
 

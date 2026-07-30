@@ -7,12 +7,16 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from gulfdocs_persistence.database import create_engine, create_session_factory
+from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from .auth import build_token_verifier
 from .config import get_settings
 from .logging import configure_logging
 from .middleware import request_context_middleware
 from .routes.demo import router as demo_router
+from .routes.documents import router as documents_router
 from .schemas import HealthResponse, ProblemDetail
 
 settings = get_settings()
@@ -22,10 +26,15 @@ logger = structlog.get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    engine = create_engine(settings.database_url)
+    app.state.engine = engine
+    app.state.session_factory = create_session_factory(engine)
+    app.state.token_verifier = build_token_verifier(settings)
     app.state.ready = True
     await logger.ainfo("service_started", service="gulfdocs-api", environment=settings.app_env)
     yield
     app.state.ready = False
+    await engine.dispose()
     await logger.ainfo("service_stopped", service="gulfdocs-api")
 
 
@@ -40,12 +49,13 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
     expose_headers=["X-Request-ID"],
 )
 if settings.public_demo_enabled:
     app.include_router(demo_router)
+app.include_router(documents_router)
 
 
 def problem_response(request: Request, status_code: int, title: str, detail: str) -> JSONResponse:
@@ -97,4 +107,9 @@ async def health() -> HealthResponse:
 async def readiness(request: Request) -> HealthResponse:
     if not getattr(request.app.state, "ready", False):
         raise HTTPException(status_code=503, detail="Service is not ready")
+    try:
+        async with request.app.state.engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Database is not ready") from exc
     return HealthResponse(status="ready", service="gulfdocs-api", version=app.version)

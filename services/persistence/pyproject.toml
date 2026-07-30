@@ -1,0 +1,21 @@
+[project]
+name = "gulfdocs-persistence"
+version = "0.1.0"
+description = "PostgreSQL persistence adapters for GulfDocs"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "gulfdocs-document-intelligence",
+  "pgvector>=0.4.1,<1",
+  "psycopg[binary,pool]>=3.2.9,<4",
+  "sqlalchemy>=2.0.42,<3",
+]
+
+[tool.uv.sources]
+gulfdocs-document-intelligence = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gulfdocs_persistence"]

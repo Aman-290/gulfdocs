@@ -8,6 +8,7 @@ members = [
   "apps/api",
   "apps/worker",
   "services/document_intelligence",
+  "services/persistence",
 ]
 
 [dependency-groups]
@@ -33,11 +34,18 @@ quote-style = "double"
 [tool.pytest.ini_options]
 addopts = "--strict-markers --strict-config -ra"
 asyncio_mode = "auto"
+markers = [
+  "integration: requires the local PostgreSQL service and migrated schema",
+]
 testpaths = [
   "apps/api/tests",
   "apps/worker/tests",
   "services/document_intelligence/tests",
+  "services/persistence/tests",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"migrations/versions/*.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -45,5 +53,5 @@ strict = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["fitz.*"]
+module = ["fitz.*", "firebase_admin", "firebase_admin.*"]
 ignore_missing_imports = true

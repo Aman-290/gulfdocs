@@ -11,12 +11,15 @@ class LocalFileStorage:
 
     async def put(self, workspace_id: UUID, document_id: UUID, source: Path) -> str:
         object_key = f"{workspace_id}/{document_id}/{uuid4()}.pdf"
+        await self.put_at(object_key, source)
+        return object_key
+
+    async def put_at(self, object_key: str, source: Path) -> None:
         target = (self.root / object_key).resolve()
         if self.root not in target.parents:
             raise ValueError("Unsafe storage object path")
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
-        return object_key
 
     async def get(self, object_key: str) -> Path:
         target = (self.root / object_key).resolve()

@@ -2,7 +2,7 @@
 
 GulfDocs is a bilingual Arabic–English document-intelligence platform that extracts structured business data, validates financial and contractual fields, supports human review, and answers questions with page-level evidence.
 
-This repository is under active phased development. The current Phase 1 foundation includes a polished synthetic public demo, a typed FastAPI demo API, a private authenticated worker endpoint, deterministic local adapters, a fake AI provider, security/status primitives, and automated unit/browser tests. Uploads, persistent workspaces, full document processing, cloud infrastructure, and deployment are tracked in [`IMPLEMENTATION_STATUS.md`](./IMPLEMENTATION_STATUS.md).
+This repository is under active phased development. Phase 1 is complete, and Phase 2 now includes the core PostgreSQL/pgvector schema, Alembic migrations, Firebase and deterministic development authentication boundaries, persistent workspace authorization, capability-token PDF uploads, and Cloud Storage/Cloud Tasks adapters. Full document processing, review, retrieval, cloud verification, and deployment are tracked in [`IMPLEMENTATION_STATUS.md`](./IMPLEMENTATION_STATUS.md).
 
 > Public data is synthetic. Anonymous uploads are disabled. Do not use the project with confidential, personal, legally sensitive, or commercially sensitive material when it is configured with a free AI API tier.
 
@@ -58,6 +58,7 @@ cp .env.example .env
 pnpm install --frozen-lockfile
 uv sync --all-packages
 docker compose up -d postgres
+uv run alembic upgrade head
 ```
 
 Start the services in separate terminals:
@@ -79,8 +80,9 @@ pnpm test
 pnpm build
 pnpm --filter @gulfdocs/web test:e2e
 uv run ruff check .
-uv run mypy apps/api/src apps/worker/src services/document_intelligence/src
-uv run pytest --cov=gulfdocs_api --cov=gulfdocs_worker --cov=gulfdocs_document_intelligence
+uv run mypy apps/api/src apps/worker/src services/document_intelligence/src services/persistence/src
+uv run pytest -m "not integration" --cov=gulfdocs_api --cov=gulfdocs_worker --cov=gulfdocs_document_intelligence
+uv run pytest -m integration
 ```
 
 Equivalent Make targets are provided for Linux, macOS, and WSL workflows. Tests report only executed results; no benchmark, deployment, customer, uptime, or cost claims are fabricated.
@@ -92,7 +94,7 @@ Equivalent Make targets are provided for Linux, macOS, and WSL workflows. Tests 
 ## Current limitations
 
 - The public demo uses seeded HTML and precomputed safe answers; synthetic PDF fixtures arrive in the evaluation phase.
-- Persistence, authenticated workspaces, signed uploads, processing orchestration, review, retrieval, and cloud adapters are not yet complete.
+- Download/delete/retry APIs, processing orchestration, review, retrieval, and live cloud-adapter verification are not yet complete.
 - Cloud deployment is blocked until a dedicated GulfDocs project is explicitly selected and external Neon/Gemini configuration is supplied.
 - Free-tier optimization does not guarantee permanently zero cost. Budget alerts notify; they do not enforce a hard spending limit.
 
