@@ -11,6 +11,7 @@ from gulfdocs_document_intelligence.adapters.local import LocalFileStorage
 from gulfdocs_document_intelligence.models import DocumentStatus
 from gulfdocs_document_intelligence.repositories import DocumentRecord
 from gulfdocs_persistence.repositories import SqlAlchemyDocumentRepository
+from gulfdocs_persistence.review import SqlAlchemyReviewRepository
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..cloud_adapters import (
@@ -22,10 +23,15 @@ from ..cloud_adapters import (
 from ..config import Settings, get_settings
 from ..dependencies import Authorized
 from ..schemas import (
+    ApproveDocumentRequest,
     CompleteUploadRequest,
+    CorrectExtractionRequest,
     DocumentResponse,
+    ExtractionFieldResponse,
+    ExtractionResponse,
     PresignUploadRequest,
     PresignUploadResponse,
+    ValidationIssueResponse,
 )
 from ..upload_service import (
     capability_hash,
@@ -355,3 +361,95 @@ async def get_document(document_id: UUID, context: Authorized) -> DocumentRespon
     if document is None:
         raise HTTPException(status_code=404, detail="Document was not found")
     return _response(document)
+
+
+@router.get("/documents/{document_id}/extraction", response_model=ExtractionResponse)
+async def get_extraction(document_id: UUID, context: Authorized) -> ExtractionResponse:
+    row = await SqlAlchemyReviewRepository(context.session).extraction_for_workspace(
+        context.identity.workspace_id, document_id
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Document extraction was not found")
+    document, result, fields, issues = row
+    return ExtractionResponse(
+        document_id=document.id,
+        schema_version=result.schema_version,
+        document_type=document.document_type,
+        fields=[
+            ExtractionFieldResponse(
+                key=field.field_key,
+                value=field.value.get("value"),
+                confidence=float(field.confidence),
+                citations=field.citations,
+            )
+            for field in fields
+        ],
+        issues=[
+            ValidationIssueResponse(
+                code=issue.code,
+                severity=issue.severity,
+                description=issue.description,
+                related_fields=issue.related_fields,
+                source_page=issue.source_page,
+                suggested_action=issue.suggested_action,
+                resolved=issue.resolved_at is not None,
+            )
+            for issue in issues
+        ],
+        approved_output=result.approved_output,
+    )
+
+
+@router.patch("/documents/{document_id}/extraction", response_model=ExtractionFieldResponse)
+async def correct_extraction(
+    document_id: UUID,
+    payload: CorrectExtractionRequest,
+    request: Request,
+    context: Authorized,
+) -> ExtractionFieldResponse:
+    field = await SqlAlchemyReviewRepository(context.session).correct_field(
+        identity=context.identity,
+        document_id=document_id,
+        field_key=payload.field_key,
+        value=payload.value,
+        reason=payload.reason,
+        request_id=request.state.request_id,
+    )
+    if field is None:
+        raise HTTPException(status_code=404, detail="Document extraction was not found")
+    return ExtractionFieldResponse(
+        key=field.field_key,
+        value=field.value.get("value"),
+        confidence=float(field.confidence),
+        citations=field.citations,
+    )
+
+
+@router.post("/documents/{document_id}/approve", response_model=DocumentResponse)
+async def approve_document(
+    document_id: UUID,
+    payload: ApproveDocumentRequest,
+    request: Request,
+    context: Authorized,
+) -> DocumentResponse:
+    try:
+        document = await SqlAlchemyReviewRepository(context.session).approve(
+            identity=context.identity,
+            document_id=document_id,
+            notes=payload.notes,
+            request_id=request.state.request_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document extraction was not found")
+    return DocumentResponse(
+        id=document.id,
+        filename=document.safe_display_name,
+        status=document.status,
+        size_bytes=document.size_bytes,
+        page_count=document.page_count,
+        content_type=document.content_type,
+        created_at=document.created_at,
+        updated_at=document.updated_at,
+    )

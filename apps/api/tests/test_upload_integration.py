@@ -2,6 +2,7 @@ import asyncio
 import selectors
 from collections.abc import Iterator
 from pathlib import Path
+from uuid import UUID
 
 import fitz
 import psycopg
@@ -10,6 +11,8 @@ from fastapi.testclient import TestClient
 from gulfdocs_api.config import get_settings
 from gulfdocs_api.main import app
 from gulfdocs_persistence.database import create_engine
+from gulfdocs_worker.config import WorkerSettings
+from gulfdocs_worker.processor import PersistentDocumentProcessor, ProcessingTask
 from sqlalchemy import text
 
 pytestmark = pytest.mark.integration
@@ -18,6 +21,28 @@ pytestmark = pytest.mark.integration
 def _pdf_bytes() -> bytes:
     document = fitz.open()
     document.new_page().insert_text((72, 72), "Synthetic GulfDocs integration test")
+    content = document.tobytes()
+    document.close()
+    return content
+
+
+def _invoice_pdf_bytes() -> bytes:
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text(
+        (72, 72),
+        "\n".join(
+            (
+                "Invoice number: INV-2026-100",
+                "Supplier: Fictional Gulf Trading LLC",
+                "Issue date: 2026-07-30",
+                "Currency: AED",
+                "Subtotal: 100.00",
+                "VAT: 5.00",
+                "Total: 105.00",
+            )
+        ),
+    )
     content = document.tobytes()
     document.close()
     return content
@@ -209,3 +234,135 @@ def test_daily_upload_limit_is_enforced(client: TestClient) -> None:
     finally:
         settings.max_uploads_per_user_per_day = original_limit
     assert blocked.status_code == 429
+
+
+def test_persistent_worker_correction_approval_and_replay(client: TestClient) -> None:
+    content = _invoice_pdf_bytes()
+    presigned = _presign(client, "alice", content, "alice-process-001")
+    assert (
+        client.put(
+            str(presigned["upload_url"]),
+            headers={"Content-Type": "application/pdf"},
+            content=content,
+        ).status_code
+        == 204
+    )
+    assert (
+        client.post(
+            "/api/v1/uploads/complete",
+            headers={"Authorization": "Bearer dev:alice"},
+            json={"document_id": presigned["document_id"]},
+        ).status_code
+        == 200
+    )
+    with psycopg.connect(_sync_database_url()) as connection:
+        run = connection.execute(
+            "SELECT id, correlation_id, attempt "
+            "FROM document_processing_runs WHERE document_id = %s",
+            (presigned["document_id"],),
+        ).fetchone()
+    assert run is not None
+    task = ProcessingTask(
+        document_id=UUID(str(presigned["document_id"])),
+        processing_run_id=run[0],
+        correlation_id=run[1],
+        attempt=run[2],
+    )
+    worker_settings = WorkerSettings(
+        database_url=get_settings().database_url,
+        storage_provider="local",
+        local_storage_root=get_settings().local_storage_root,
+        ai_provider="fake",
+    )
+    with asyncio.Runner(
+        loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector())
+    ) as runner:
+        processed = runner.run(PersistentDocumentProcessor(worker_settings).process(task))
+        replayed = runner.run(PersistentDocumentProcessor(worker_settings).process(task))
+    assert processed.status == "processed"
+    assert replayed.idempotent_replay is True
+
+    extraction = client.get(
+        f"/api/v1/documents/{presigned['document_id']}/extraction",
+        headers={"Authorization": "Bearer dev:alice"},
+    )
+    assert extraction.status_code == 200, extraction.text
+    assert extraction.json()["document_type"] == "invoice"
+    correction = client.patch(
+        f"/api/v1/documents/{presigned['document_id']}/extraction",
+        headers={"Authorization": "Bearer dev:alice"},
+        json={
+            "field_key": "supplier_name",
+            "value": "Corrected Fictional Supplier LLC",
+            "reason": "Matched cited source",
+        },
+    )
+    assert correction.status_code == 200
+    approved = client.post(
+        f"/api/v1/documents/{presigned['document_id']}/approve",
+        headers={"Authorization": "Bearer dev:alice"},
+        json={"notes": "Synthetic fixture reviewed"},
+    )
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["status"] == "approved"
+    with psycopg.connect(_sync_database_url()) as connection:
+        counts = connection.execute(
+            "SELECT "
+            "(SELECT count(*) FROM extraction_revisions), "
+            "(SELECT count(*) FROM document_reviews), "
+            "(SELECT count(*) FROM document_chunks WHERE document_id = %s)",
+            (presigned["document_id"],),
+        ).fetchone()
+    assert counts is not None and counts[0] == 1 and counts[1] == 1 and counts[2] >= 1
+
+
+def test_persistent_worker_records_non_retryable_storage_failure(client: TestClient) -> None:
+    content = _pdf_bytes()
+    presigned = _presign(client, "alice", content, "alice-process-failure")
+    client.put(
+        str(presigned["upload_url"]),
+        headers={"Content-Type": "application/pdf"},
+        content=content,
+    )
+    client.post(
+        "/api/v1/uploads/complete",
+        headers={"Authorization": "Bearer dev:alice"},
+        json={"document_id": presigned["document_id"]},
+    )
+    with psycopg.connect(_sync_database_url()) as connection:
+        row = connection.execute(
+            "SELECT r.id, r.correlation_id, r.attempt, d.storage_key "
+            "FROM document_processing_runs r JOIN documents d ON d.id = r.document_id "
+            "WHERE d.id = %s",
+            (presigned["document_id"],),
+        ).fetchone()
+    assert row is not None
+    (Path(get_settings().local_storage_root) / row[3]).unlink()
+    task = ProcessingTask(
+        document_id=UUID(str(presigned["document_id"])),
+        processing_run_id=row[0],
+        correlation_id=row[1],
+        attempt=row[2],
+    )
+    settings = WorkerSettings(
+        database_url=get_settings().database_url,
+        local_storage_root=get_settings().local_storage_root,
+        storage_provider="local",
+    )
+    with (
+        asyncio.Runner(
+            loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector())
+        ) as runner,
+        pytest.raises(FileNotFoundError),
+    ):
+        runner.run(PersistentDocumentProcessor(settings).process(task))
+    with psycopg.connect(_sync_database_url()) as connection:
+        status_row = connection.execute(
+            "SELECT d.status, r.status, r.failure_category "
+            "FROM documents d JOIN document_processing_runs r ON r.document_id = d.id "
+            "WHERE d.id = %s",
+            (presigned["document_id"],),
+        ).fetchone()
+    assert status_row is not None
+    assert status_row[0:2] == ("failed", "failed")
+    assert status_row[2] == "FileNotFoundError"

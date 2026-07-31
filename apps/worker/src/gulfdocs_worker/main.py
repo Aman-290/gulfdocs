@@ -12,6 +12,7 @@ from google.oauth2 import id_token
 from pydantic import BaseModel, Field
 
 from .config import WorkerSettings, get_worker_settings
+from .processor import PersistentDocumentProcessor, ProcessingTask
 
 
 def configure_logging(level: str) -> None:
@@ -120,6 +121,23 @@ async def health() -> dict[str, str]:
     dependencies=[Depends(require_worker_identity)],
 )
 async def process_document(task: ProcessDocumentTask) -> TaskResult:
+    if settings.worker_processing_mode == "persistent":
+        outcome = await PersistentDocumentProcessor(settings).process(
+            ProcessingTask(
+                document_id=task.document_id,
+                processing_run_id=task.processing_run_id,
+                correlation_id=task.correlation_id,
+                attempt=task.attempt,
+            )
+        )
+        return TaskResult(
+            status=outcome.status,
+            document_id=task.document_id,
+            processing_run_id=task.processing_run_id,
+            idempotent_replay=outcome.idempotent_replay,
+        )
+    if settings.worker_processing_mode != "mock":
+        raise HTTPException(status_code=503, detail="Worker processing mode is not configured")
     replay = task.processing_run_id in _completed_runs
     if not replay:
         # The deterministic pipeline and persistent lock arrive in Phase 3. This local

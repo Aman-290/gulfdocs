@@ -13,7 +13,8 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 - [x] Detect authenticated GitHub, Google Cloud, and Firebase accounts.
 - [x] Refuse to reuse the unrelated active GCP project `solarsaas-ff521`.
 - [!] Terraform CLI is not installed; Terraform sources can still be authored and validated later in CI or after local installation.
-- [!] No dedicated GulfDocs GCP project, Firebase project, Neon database, Gemini key, or deployment approval is currently selected.
+- [x] Select and verify dedicated billing-enabled GCP project `gulfdocs` (`192591567730`) and set it as the active CLI project.
+- [!] The selected GCP project is not yet Firebase-enabled, and no deployed PostgreSQL connection is configured.
 
 ## Phase 1 — Monorepo foundation and local vertical slice
 
@@ -45,14 +46,14 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 
 ## Phase 3 — Deterministic processing, extraction, validation, and review
 
-- [~] Implement the deterministic LangGraph workflow, processing lock, retry taxonomy, atomic finalization, and failure persistence. The provider-neutral graph is implemented; worker locking and persistent finalization remain.
+- [x] Implement the deterministic LangGraph workflow, row-locked idempotent worker processing, bounded task attempts, atomic result finalization, safe temporary cleanup, and failure persistence.
 - [x] Parse PDFs with PyMuPDF while preserving page boundaries and Arabic text.
-- [~] Implement language detection, document classification, schema selection, normalization, prompt-injection detection, and security events. Deterministic analysis is implemented; security-event persistence in the worker remains.
-- [~] Implement `GeminiProvider` and deterministic `FakeAIProvider` for classification, structured extraction, embeddings, and grounded responses. The 768-dimension fake provider is complete; Gemini remains externally blocked and unimplemented.
-- [~] Implement invoice, quotation, purchase-order, and contract schemas with page citations and field confidence. A versioned common schema and required-field profiles exist; full type-specific field breadth remains.
-- [~] Implement arithmetic, date, currency, identifier, confidence, and contract validation rules. Required-field, confidence, and total arithmetic checks exist; remaining rule families remain.
-- [ ] Implement extraction correction, revision history, approval rules, and audit events.
-- [ ] Cover idempotency, retries, provider failures, Arabic preservation, and legal transitions with tests.
+- [x] Implement language detection, document classification, schema selection, normalization, prompt-injection detection, and persisted security events.
+- [x] Implement stable-model `GeminiProvider` and deterministic `FakeAIProvider` for classification, structured extraction, 768-dimension embeddings, and grounded responses. Live Gemini verification is deferred to the cloud phase.
+- [x] Implement versioned invoice, quotation, purchase-order, and contract field profiles with page citations, explicit unavailable values, and per-field confidence.
+- [x] Implement required-field, arithmetic, line-item, date-order, currency, identifier, duplicate-workspace identifier, confidence, and contract validation rules.
+- [x] Implement workspace-authorized extraction correction, revision history, blocking approval rules, approved output, reviews, and audit events.
+- [x] Cover idempotent worker replay, retries, arithmetic/provider-path failures, Arabic preservation, legal transitions, correction, approval, and audit persistence with tests.
 
 ## Phase 4 — Hybrid retrieval and grounded Q&A
 
@@ -100,8 +101,8 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 - [ ] Add all 12 architecture decision records, IAM role rationale, cost caveats, deployment instructions, and operations runbook.
 - [ ] Create `../gulfdocs-private/GULFDOCS_LEARNING_GUIDE.md` from the actual implementation and verify it is untracked.
 - [ ] Install/obtain Terraform validation capability or validate through CI.
-- [!] Obtain explicit selection/approval for a dedicated GulfDocs GCP/Firebase project before provisioning billable resources.
-- [!] Obtain Neon and Gemini configuration for real-provider/database/cloud smoke tests; local adapters remain the required fallback.
+- [x] Obtain explicit selection/approval for dedicated billing-enabled GCP project `gulfdocs` (`192591567730`).
+- [~] Configure a deployed PostgreSQL service and verify Vertex AI Gemini for real-provider/database/cloud smoke tests; local adapters remain the deterministic fallback.
 - [ ] Provision and deploy only after local quality gates pass; verify privacy, OIDC delivery, scaling limits, lifecycle rules, logs, and deployed synthetic E2E flow.
 - [ ] Record real URLs, resources, test/coverage/evaluation results, costs/risks, limitations, resume bullets, and walkthrough.
 - [ ] Confirm no secrets/private-spec files are tracked, clean Git status, and remove or convert this temporary file.
@@ -110,10 +111,9 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 
 | Blocker                                              | Exact impact                                                                                                                      | Local continuation                                                                                          |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Active GCP project is unrelated (`solarsaas-ff521`)  | No provisioning or deployment may safely target it.                                                                               | Build Terraform, scripts, emulators, and cloud adapter interfaces without applying infrastructure.          |
-| Dedicated GulfDocs GCP/Firebase project not selected | Cloud Run, Tasks, Storage, Firebase Auth/App Hosting, Artifact Registry, IAM, WIF, secrets, and deployed URLs cannot be verified. | Use local storage, inline tasks, development auth, fake AI, and Docker PostgreSQL.                          |
+| Firebase is not yet enabled on `gulfdocs`             | Firebase Authentication and App Hosting cannot be configured until the project is registered with Firebase.                       | Enable Firebase during the cloud infrastructure phase after local product gates pass.                       |
 | Neon connection string not supplied                  | Deployed Neon repository behavior cannot be smoke-tested.                                                                         | Test against local PostgreSQL with pgvector and keep repositories database-portable.                        |
-| Gemini credentials/configuration not supplied        | Real model extraction, embeddings, Q&A, quota, latency, and cost metrics cannot be measured.                                      | Implement and test the provider adapter with a deterministic fake; real evaluation remains explicit opt-in. |
+| Gemini live configuration not yet verified           | Real extraction, embeddings, Q&A, quota, latency, and cost metrics are not yet measured.                                          | Use Vertex AI ADC in the selected project and retain the deterministic fake as the default evaluation path. |
 | Terraform CLI missing                                | Local `terraform fmt/validate` cannot yet run.                                                                                    | Author version-pinned configuration and validate in CI or after installing the CLI.                         |
 
 ## Verified command log
@@ -139,3 +139,5 @@ Only real results belong here.
 | 2026-07-30 | Authenticated upload tests | Passed: 3 PostgreSQL integration journeys covering idempotency, PDF validation, completion/queueing, and cross-workspace denial.              |
 | 2026-07-30 | Backend tests (Phase 2)    | Passed: 25 tests total with strict Ruff and mypy checks; one upstream TestClient deprecation warning remains.                                |
 | 2026-07-30 | Phase 3 domain tests       | Passed: 20 document-intelligence tests covering page boundaries, bilingual detection, citations, arithmetic mismatch, injection signals, and 768-dimension embeddings. |
+| 2026-07-31 | Dedicated GCP selection    | Passed: `gulfdocs` / `192591567730` is active, billing-enabled, selected in gcloud, and owned by the authenticated development account.          |
+| 2026-07-31 | Phase 3 complete           | Passed: 36 backend tests including persistent worker processing/replay/failure, pgvector indexing, corrections, approval, revisions, and audits; Ruff, mypy, and Alembic drift checks passed. |

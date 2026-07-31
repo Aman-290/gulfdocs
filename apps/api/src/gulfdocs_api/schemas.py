@@ -48,3 +48,39 @@ class DocumentResponse(BaseModel):
     content_type: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class ExtractionFieldResponse(BaseModel):
+    key: str
+    value: str | list[str] | None
+    confidence: float
+    citations: list[dict[str, Any]]
+
+
+class ValidationIssueResponse(BaseModel):
+    code: str
+    severity: str
+    description: str
+    related_fields: list[str]
+    source_page: int | None
+    suggested_action: str
+    resolved: bool
+
+
+class ExtractionResponse(BaseModel):
+    document_id: UUID
+    schema_version: str
+    document_type: str | None
+    fields: list[ExtractionFieldResponse]
+    issues: list[ValidationIssueResponse]
+    approved_output: dict[str, Any] | None
+
+
+class CorrectExtractionRequest(BaseModel):
+    field_key: str = Field(min_length=1, max_length=100, pattern=r"^[a-z][a-z0-9_]*$")
+    value: str | list[str] | None
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class ApproveDocumentRequest(BaseModel):
+    notes: str | None = Field(default=None, max_length=2_000)

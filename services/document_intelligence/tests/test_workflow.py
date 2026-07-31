@@ -2,9 +2,11 @@ from pathlib import Path
 
 import fitz
 import pytest
-from gulfdocs_document_intelligence.models import DocumentType
+from gulfdocs_document_intelligence.extraction import ExtractedValue, StructuredExtraction
+from gulfdocs_document_intelligence.models import Citation, DocumentType
 from gulfdocs_document_intelligence.parsing import detect_language, parse_pdf_pages
 from gulfdocs_document_intelligence.providers import FakeAIProvider
+from gulfdocs_document_intelligence.validation import validate_extraction
 from gulfdocs_document_intelligence.workflow import DeterministicDocumentWorkflow
 
 
@@ -74,3 +76,21 @@ async def test_fake_embeddings_match_pgvector_dimension() -> None:
     vectors = await FakeAIProvider().embed(["مرحبا", "hello"])
     assert len(vectors) == 2
     assert all(len(vector) == 768 for vector in vectors)
+
+
+def test_due_date_before_issue_date_is_blocking() -> None:
+    citation = [Citation(page=1, excerpt="Synthetic date")]
+    extraction = StructuredExtraction(
+        document_type=DocumentType.INVOICE,
+        fields={
+            "document_number": ExtractedValue(value="INV-1", confidence=1, citations=citation),
+            "supplier_name": ExtractedValue(
+                value="Fictional LLC", confidence=1, citations=citation
+            ),
+            "issue_date": ExtractedValue(value="2026-07-30", confidence=1, citations=citation),
+            "due_date": ExtractedValue(value="2026-07-01", confidence=1, citations=citation),
+            "currency": ExtractedValue(value="AED", confidence=1, citations=citation),
+            "total": ExtractedValue(value="10.00", confidence=1, citations=citation),
+        },
+    )
+    assert "DATE_ORDER_INVALID" in {issue.code for issue in validate_extraction(extraction)}

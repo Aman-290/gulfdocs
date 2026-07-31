@@ -39,15 +39,26 @@ class FakeAIProvider:
                 r"(?:number|no\.?|#)?\s*[:#-]?\s*([A-Z0-9][A-Z0-9/_-]+)"
             ),
             "supplier_name": r"(?:supplier|vendor)\s*[:\-]\s*([^\n]+)",
+            "customer_name": r"(?:customer|client)\s*[:\-]\s*([^\n]+)",
             "buyer_name": r"(?:buyer|customer)\s*[:\-]\s*([^\n]+)",
             "issue_date": r"(?:issue date|date)\s*[:\-]\s*(\d{4}-\d{2}-\d{2})",
+            "due_date": r"due date\s*[:\-]\s*(\d{4}-\d{2}-\d{2})",
             "effective_date": r"effective date\s*[:\-]\s*(\d{4}-\d{2}-\d{2})",
+            "expiry_date": r"(?:expiry|expiration) date\s*[:\-]\s*(\d{4}-\d{2}-\d{2})",
+            "requested_delivery_date": r"requested delivery date\s*[:\-]\s*(\d{4}-\d{2}-\d{2})",
+            "delivery_address": r"delivery address\s*[:\-]\s*([^\n]+)",
             "currency": r"currency\s*[:\-]\s*(AED|USD|EUR)",
             "subtotal": r"subtotal\s*[:\-]\s*([\d,.]+)",
             "tax": r"(?:tax|vat)\s*[:\-]\s*([\d,.]+)",
-            "total": r"(?:grand )?total\s*[:\-]\s*([\d,.]+)",
+            "total": r"\b(?:grand\s+)?total\b\s*[:\-]\s*([\d,.]+)",
             "governing_law": r"governing law\s*[:\-]\s*([^\n]+)",
             "parties": r"parties\s*[:\-]\s*([^\n]+)",
+            "title": r"(?:contract title|title)\s*[:\-]\s*([^\n]+)",
+            "payment_terms": r"payment terms\s*[:\-]\s*([^\n]+)",
+            "terms": r"terms\s*[:\-]\s*([^\n]+)",
+            "renewal_terms": r"renewal terms\s*[:\-]\s*([^\n]+)",
+            "termination_terms": r"termination terms\s*[:\-]\s*([^\n]+)",
+            "obligations": r"obligations\s*[:\-]\s*([^\n]+)",
         }
         fields: dict[str, ExtractedValue] = {}
         for key, pattern in patterns.items():

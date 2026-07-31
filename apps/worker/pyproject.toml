@@ -6,6 +6,7 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
   "fastapi>=0.116.1,<1",
   "google-auth>=2.40.3,<3",
+  "google-cloud-storage>=3.2.0,<4",
   "gulfdocs-document-intelligence",
   "gulfdocs-persistence",
   "pydantic-settings>=2.10.1,<3",
