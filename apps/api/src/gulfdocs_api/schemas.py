@@ -46,6 +46,8 @@ class DocumentResponse(BaseModel):
     size_bytes: int | None
     page_count: int | None
     content_type: str | None
+    document_type: str | None = None
+    detected_language: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -98,4 +100,11 @@ class PrivateAnswerResponse(BaseModel):
     model_name: str
     prompt_version: str
     latency_ms: int
+    created_at: datetime
+
+
+class AuditEventResponse(BaseModel):
+    id: UUID
+    event_type: str
+    safe_metadata: dict[str, Any]
     created_at: datetime

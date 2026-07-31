@@ -32,6 +32,8 @@ def _document_record(document: Document) -> DocumentRecord:
         storage_key=document.storage_key,
         created_at=document.created_at,
         updated_at=document.updated_at,
+        document_type=document.document_type,
+        detected_language=document.detected_language,
     )
 
 

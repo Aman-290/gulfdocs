@@ -29,6 +29,8 @@ class DocumentRecord:
     storage_key: str | None
     created_at: datetime
     updated_at: datetime
+    document_type: str | None = None
+    detected_language: str | None = None
 
 
 class IdentityRepository(Protocol):

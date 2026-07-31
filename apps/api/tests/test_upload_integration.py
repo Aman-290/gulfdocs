@@ -325,6 +325,21 @@ def test_persistent_worker_correction_approval_and_replay(client: TestClient) ->
     )
     assert history.status_code == 200
     assert len(history.json()) == 1
+    audit = client.get(
+        f"/api/v1/documents/{presigned['document_id']}/audit",
+        headers={"Authorization": "Bearer dev:alice"},
+    )
+    assert audit.status_code == 200
+    event_types = {event["event_type"] for event in audit.json()}
+    assert {"extraction_corrected", "document_approved", "question_submitted"}.issubset(
+        event_types
+    )
+    assert all("document_text" not in event["safe_metadata"] for event in audit.json())
+    unauthorized_audit = client.get(
+        f"/api/v1/documents/{presigned['document_id']}/audit",
+        headers={"Authorization": "Bearer dev:bob"},
+    )
+    assert unauthorized_audit.status_code == 404
     unsupported = client.post(
         f"/api/v1/documents/{presigned['document_id']}/questions",
         headers={"Authorization": "Bearer dev:alice"},

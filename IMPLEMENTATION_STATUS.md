@@ -67,12 +67,12 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 
 ## Phase 5 — Complete bilingual product experience
 
-- [ ] Complete recruiter landing, architecture, evaluation, sign-in, and public-demo routes.
-- [ ] Implement Firebase Google/email auth, secure logout, token forwarding, protected routes, and local test auth.
-- [ ] Build dashboard lists, search, filters, status/retry states, limits, and quality metrics.
-- [ ] Build responsive split PDF/detail view with fields, issues, Q&A, processing, and audit tabs.
-- [ ] Add correction/approval workflows, citation navigation, loading/empty/error/retry states, keyboard navigation, visible focus, and accessible contrast.
-- [ ] Verify desktop, tablet, mobile, English LTR, and Arabic RTL behavior.
+- [x] Complete recruiter landing, architecture, evaluation, sign-in, and public-demo routes.
+- [x] Implement Firebase Google/email auth, secure logout, ID-token forwarding, protected routes, and isolated local test auth.
+- [x] Build dashboard lists, filename search, status/type/language/approval filters, retry states, bounded polling, limits, and quality metrics.
+- [x] Build responsive split authenticated browser-PDF/detail view with fields, issues, grounded Q&A, processing, and workspace-scoped audit tabs.
+- [x] Add correction/approval workflows, citation navigation, loading/empty/error/retry states, keyboard navigation, visible focus, and accessible contrast.
+- [x] Verify production compilation plus desktop and mobile browser journeys, English LTR, Arabic RTL direction, and horizontal-overflow behavior.
 
 ## Phase 6 — Synthetic data, evaluation, and comprehensive tests
 
@@ -109,36 +109,39 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 
 ## Blocker log
 
-| Blocker                                              | Exact impact                                                                                                                      | Local continuation                                                                                          |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Firebase is not yet enabled on `gulfdocs`             | Firebase Authentication and App Hosting cannot be configured until the project is registered with Firebase.                       | Enable Firebase during the cloud infrastructure phase after local product gates pass.                       |
-| Neon connection string not supplied                  | Deployed Neon repository behavior cannot be smoke-tested.                                                                         | Test against local PostgreSQL with pgvector and keep repositories database-portable.                        |
-| Gemini live configuration not yet verified           | Real extraction, embeddings, Q&A, quota, latency, and cost metrics are not yet measured.                                          | Use Vertex AI ADC in the selected project and retain the deterministic fake as the default evaluation path. |
-| Terraform CLI missing                                | Local `terraform fmt/validate` cannot yet run.                                                                                    | Author version-pinned configuration and validate in CI or after installing the CLI.                         |
+| Blocker                                    | Exact impact                                                                                                | Local continuation                                                                                          |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Firebase is not yet enabled on `gulfdocs`  | Firebase Authentication and App Hosting cannot be configured until the project is registered with Firebase. | Enable Firebase during the cloud infrastructure phase after local product gates pass.                       |
+| Neon connection string not supplied        | Deployed Neon repository behavior cannot be smoke-tested.                                                   | Test against local PostgreSQL with pgvector and keep repositories database-portable.                        |
+| Gemini live configuration not yet verified | Real extraction, embeddings, Q&A, quota, latency, and cost metrics are not yet measured.                    | Use Vertex AI ADC in the selected project and retain the deterministic fake as the default evaluation path. |
+| Terraform CLI missing                      | Local `terraform fmt/validate` cannot yet run.                                                              | Author version-pinned configuration and validate in CI or after installing the CLI.                         |
 
 ## Verified command log
 
 Only real results belong here.
 
-| Date       | Command/check              | Result                                                                                                                                       |
-| ---------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-30 | Private specification read | Passed: complete 2,345-line file read from outside repository.                                                                               |
-| 2026-07-30 | Project directory audit    | Passed: empty, no unrelated files.                                                                                                           |
-| 2026-07-30 | Git audit                  | Initialized on `feat/gulfdocs-platform`; no remote configured.                                                                               |
-| 2026-07-30 | Tool audit                 | Git 2.39.1, GitHub CLI 2.93.0, gcloud 548.0.0, Firebase CLI 15.24.0, Node 22.18.0, pnpm 10.6.5, uv 0.9.18, Docker 29.4.3; Terraform missing. |
-| 2026-07-30 | Formatting and lint        | Passed: Prettier, Ruff format/check, and ESLint with zero warnings.                                                                          |
-| 2026-07-30 | Type checks                | Passed: strict TypeScript and strict mypy across API, worker, and domain sources.                                                            |
-| 2026-07-30 | Backend tests              | Passed: 19 tests; 94% combined statement coverage. One upstream TestClient deprecation warning remains.                                      |
-| 2026-07-30 | Frontend unit tests        | Passed: 3 tests; 100% statements/lines/functions and 90.9% branches on the measured Phase 1 component/data surface.                          |
-| 2026-07-30 | Browser test               | Passed: 1 Chromium recruiter journey through landing page, demo question, answer, and page citation.                                         |
-| 2026-07-30 | Next.js production build   | Passed: seven application routes plus not-found page compiled and statically prerendered.                                                    |
-| 2026-07-30 | Container builds/runtime   | Passed: non-root API and worker images built; health checks, unauthenticated rejection, and authenticated task processing verified.          |
-| 2026-07-30 | PostgreSQL/pgvector        | Passed: PostgreSQL 17 container became healthy and pgvector 0.8.6 extension loaded; container stopped after verification.                    |
-| 2026-07-30 | Local smoke                | Passed: API health and seeded synthetic public-demo listing.                                                                                 |
-| 2026-07-30 | Alembic schema             | Passed: clean downgrade/upgrade, pgvector initialization, and `alembic check` with no drift.                                                  |
-| 2026-07-30 | Authenticated upload tests | Passed: 3 PostgreSQL integration journeys covering idempotency, PDF validation, completion/queueing, and cross-workspace denial.              |
-| 2026-07-30 | Backend tests (Phase 2)    | Passed: 25 tests total with strict Ruff and mypy checks; one upstream TestClient deprecation warning remains.                                |
-| 2026-07-30 | Phase 3 domain tests       | Passed: 20 document-intelligence tests covering page boundaries, bilingual detection, citations, arithmetic mismatch, injection signals, and 768-dimension embeddings. |
-| 2026-07-31 | Dedicated GCP selection    | Passed: `gulfdocs` / `192591567730` is active, billing-enabled, selected in gcloud, and owned by the authenticated development account.          |
-| 2026-07-31 | Phase 3 complete           | Passed: 36 backend tests including persistent worker processing/replay/failure, pgvector indexing, corrections, approval, revisions, and audits; Ruff, mypy, and Alembic drift checks passed. |
-| 2026-07-31 | Phase 4 complete           | Passed: 37 backend tests including RRF ordering, bounded context, PostgreSQL FTS/pgvector retrieval, cited answers, unsupported answers, history, and cross-workspace Q&A denial. |
+| Date       | Command/check              | Result                                                                                                                                                                                         |
+| ---------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-30 | Private specification read | Passed: complete 2,345-line file read from outside repository.                                                                                                                                 |
+| 2026-07-30 | Project directory audit    | Passed: empty, no unrelated files.                                                                                                                                                             |
+| 2026-07-30 | Git audit                  | Initialized on `feat/gulfdocs-platform`; no remote configured.                                                                                                                                 |
+| 2026-07-30 | Tool audit                 | Git 2.39.1, GitHub CLI 2.93.0, gcloud 548.0.0, Firebase CLI 15.24.0, Node 22.18.0, pnpm 10.6.5, uv 0.9.18, Docker 29.4.3; Terraform missing.                                                   |
+| 2026-07-30 | Formatting and lint        | Passed: Prettier, Ruff format/check, and ESLint with zero warnings.                                                                                                                            |
+| 2026-07-30 | Type checks                | Passed: strict TypeScript and strict mypy across API, worker, and domain sources.                                                                                                              |
+| 2026-07-30 | Backend tests              | Passed: 19 tests; 94% combined statement coverage. One upstream TestClient deprecation warning remains.                                                                                        |
+| 2026-07-30 | Frontend unit tests        | Passed: 3 tests; 100% statements/lines/functions and 90.9% branches on the measured Phase 1 component/data surface.                                                                            |
+| 2026-07-30 | Browser test               | Passed: 1 Chromium recruiter journey through landing page, demo question, answer, and page citation.                                                                                           |
+| 2026-07-30 | Next.js production build   | Passed: seven application routes plus not-found page compiled and statically prerendered.                                                                                                      |
+| 2026-07-30 | Container builds/runtime   | Passed: non-root API and worker images built; health checks, unauthenticated rejection, and authenticated task processing verified.                                                            |
+| 2026-07-30 | PostgreSQL/pgvector        | Passed: PostgreSQL 17 container became healthy and pgvector 0.8.6 extension loaded; container stopped after verification.                                                                      |
+| 2026-07-30 | Local smoke                | Passed: API health and seeded synthetic public-demo listing.                                                                                                                                   |
+| 2026-07-30 | Alembic schema             | Passed: clean downgrade/upgrade, pgvector initialization, and `alembic check` with no drift.                                                                                                   |
+| 2026-07-30 | Authenticated upload tests | Passed: 3 PostgreSQL integration journeys covering idempotency, PDF validation, completion/queueing, and cross-workspace denial.                                                               |
+| 2026-07-30 | Backend tests (Phase 2)    | Passed: 25 tests total with strict Ruff and mypy checks; one upstream TestClient deprecation warning remains.                                                                                  |
+| 2026-07-30 | Phase 3 domain tests       | Passed: 20 document-intelligence tests covering page boundaries, bilingual detection, citations, arithmetic mismatch, injection signals, and 768-dimension embeddings.                         |
+| 2026-07-31 | Dedicated GCP selection    | Passed: `gulfdocs` / `192591567730` is active, billing-enabled, selected in gcloud, and owned by the authenticated development account.                                                        |
+| 2026-07-31 | Phase 3 complete           | Passed: 36 backend tests including persistent worker processing/replay/failure, pgvector indexing, corrections, approval, revisions, and audits; Ruff, mypy, and Alembic drift checks passed.  |
+| 2026-07-31 | Phase 4 complete           | Passed: 37 backend tests including RRF ordering, bounded context, PostgreSQL FTS/pgvector retrieval, cited answers, unsupported answers, history, and cross-workspace Q&A denial.              |
+| 2026-07-31 | Phase 5 frontend gates     | Passed: strict TypeScript, ESLint with zero warnings, Prettier, Next.js production build, 9 Vitest tests at 78.28% statements/lines and 66.49% branches, and authenticated component journeys. |
+| 2026-07-31 | Phase 5 backend gates      | Passed: 37 tests including workspace-scoped audit history and cross-workspace denial; strict Ruff and mypy checks pass. Two upstream deprecation warnings remain.                              |
+| 2026-07-31 | Phase 5 browser gates      | Passed: 4 serial Chromium journeys covering signed-out protection, authenticated review/evidence/audit, public demo, mobile RTL, tablet responsiveness, and horizontal-overflow assertions.    |

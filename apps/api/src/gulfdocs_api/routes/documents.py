@@ -43,6 +43,7 @@ from ..config import Settings, get_settings
 from ..dependencies import Authorized
 from ..schemas import (
     ApproveDocumentRequest,
+    AuditEventResponse,
     CompleteUploadRequest,
     CorrectExtractionRequest,
     DocumentResponse,
@@ -87,6 +88,8 @@ def _response(document: DocumentRecord) -> DocumentResponse:
         size_bytes=document.size_bytes,
         page_count=document.page_count,
         content_type=document.content_type,
+        document_type=document.document_type,
+        detected_language=document.detected_language,
         created_at=document.created_at,
         updated_at=document.updated_at,
     )
@@ -485,6 +488,8 @@ async def approve_document(
         size_bytes=document.size_bytes,
         page_count=document.page_count,
         content_type=document.content_type,
+        document_type=document.document_type,
+        detected_language=document.detected_language,
         created_at=document.created_at,
         updated_at=document.updated_at,
     )
@@ -624,4 +629,39 @@ async def list_questions(document_id: UUID, context: Authorized) -> list[Private
             created_at=answer.created_at,
         )
         for question, answer in rows
+    ]
+
+
+@router.get("/documents/{document_id}/audit", response_model=list[AuditEventResponse])
+async def list_document_audit(
+    document_id: UUID, context: Authorized
+) -> list[AuditEventResponse]:
+    document = await context.session.scalar(
+        select(Document.id).where(
+            Document.id == document_id,
+            Document.workspace_id == context.identity.workspace_id,
+            Document.status != DocumentStatus.DELETED.value,
+        )
+    )
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document was not found")
+    events = list(
+        await context.session.scalars(
+            select(AuditEvent)
+            .where(
+                AuditEvent.document_id == document_id,
+                AuditEvent.workspace_id == context.identity.workspace_id,
+            )
+            .order_by(AuditEvent.created_at.desc())
+            .limit(200)
+        )
+    )
+    return [
+        AuditEventResponse(
+            id=event.id,
+            event_type=event.event_type,
+            safe_metadata=event.safe_metadata,
+            created_at=event.created_at,
+        )
+        for event in events
     ]

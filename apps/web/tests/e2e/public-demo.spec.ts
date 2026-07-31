@@ -15,3 +15,15 @@ test("a recruiter can inspect the public synthetic demo", async ({ page }) => {
   await expect(page.getByText(/printed total is AED 12,862.50/i)).toBeVisible();
   await expect(page.getByRole("link", { name: "Page 1" })).toBeVisible();
 });
+
+test("Arabic RTL experience fits a mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/ar");
+  const main = page.locator("main[lang='ar']");
+  await expect(main).toHaveAttribute("dir", "rtl");
+  await expect(main.getByRole("heading", { level: 1 })).toBeVisible();
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth,
+  );
+  expect(hasHorizontalOverflow).toBe(false);
+});
