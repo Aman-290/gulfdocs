@@ -1,4 +1,4 @@
-.PHONY: bootstrap install dev dev-web dev-api dev-worker db-up db-down migrate migration seed lint format typecheck test test-unit test-integration test-e2e eval build docker-build terraform-fmt terraform-validate smoke-local smoke-production
+.PHONY: bootstrap install dev dev-web dev-api dev-worker db-up db-down migrate migration seed lint format typecheck test test-unit test-integration test-e2e eval eval-extraction eval-retrieval eval-grounding eval-real-gemini build docker-build terraform-fmt terraform-validate smoke-local smoke-production
 
 bootstrap: install db-up migrate seed
 
@@ -44,7 +44,7 @@ format:
 
 typecheck:
 	pnpm typecheck
-	uv run mypy apps/api/src apps/worker/src services/document_intelligence/src services/persistence/src
+	uv run mypy apps/api/src apps/worker/src services/document_intelligence/src services/persistence/src evaluation
 
 test: test-unit
 
@@ -59,7 +59,25 @@ test-e2e:
 	pnpm --filter @gulfdocs/web test:e2e
 
 eval:
-	@echo "Evaluation commands are introduced in Phase 6."
+	uv run python -m evaluation.generate_documents
+	uv run python -m evaluation.run
+
+eval-extraction:
+	uv run python -m evaluation.generate_documents
+	uv run python -m evaluation.run --suite extraction
+
+eval-retrieval:
+	uv run python -m evaluation.generate_documents
+	uv run python -m evaluation.run --suite retrieval
+
+eval-grounding:
+	uv run python -m evaluation.generate_documents
+	uv run python -m evaluation.run --suite grounding
+
+eval-real-gemini:
+	@test "$(RUN_REAL_GEMINI_EVAL)" = "1" || (echo "RUN_REAL_GEMINI_EVAL=1 is required" && exit 1)
+	uv run python -m evaluation.generate_documents
+	uv run python -m evaluation.run --provider gemini
 
 build:
 	pnpm build

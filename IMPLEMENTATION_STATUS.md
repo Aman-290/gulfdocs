@@ -76,13 +76,13 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 
 ## Phase 6 — Synthetic data, evaluation, and comprehensive tests
 
-- [ ] Generate fictional English, Arabic, and bilingual invoices, quotation, purchase order, and short contract PDFs.
-- [ ] Include multi-page/table/scanned-looking/malformed/missing/low-confidence/duplicate/injection/date/currency cases.
-- [ ] Seed processed public-demo results and expected JSON without confidential or real personal data.
-- [ ] Implement fake-provider extraction, retrieval, grounding, language-sliced, latency, token, and estimated-cost evaluation.
-- [ ] Emit measured JSON/Markdown reports with versions, timestamps, baselines, and per-case failures.
-- [ ] Add backend unit/integration, frontend component, and full Playwright journeys including cross-workspace denial.
-- [ ] Set and meet reasonable coverage thresholds; never publish invented metrics.
+- [x] Generate 12 fictional English, Arabic, and bilingual invoice, quotation, purchase-order, and short-contract PDFs from versioned source cases.
+- [x] Include multi-page tables, scanned-looking layout, malformed/missing/low-confidence values, duplicate identifiers, injection text, difficult dates, AED, USD, and EUR cases.
+- [x] Keep the public demo on processed synthetic values/precomputed answers and add expected JSON without confidential or real personal data.
+- [x] Implement opt-in-provider extraction, retrieval, grounding, validation/security, language-sliced, latency, token, and estimated-cost evaluation; fake remains the default.
+- [x] Emit measured JSON/Markdown reports with model/prompt/parser/dataset versions, timestamps, actual baseline deltas, and per-case failures.
+- [x] Add evaluation/backend tests, frontend auth/retry components, and full Playwright upload/process/correct/approve/audit/isolation journeys.
+- [x] Meet frontend coverage thresholds at 86.67% statements/lines, 76% functions, and 69.44% branches; publish only executed fake-provider measurements with explicit caveats.
 
 ## Phase 7 — Cloud infrastructure, security, observability, and delivery
 
@@ -145,3 +145,6 @@ Only real results belong here.
 | 2026-07-31 | Phase 5 frontend gates     | Passed: strict TypeScript, ESLint with zero warnings, Prettier, Next.js production build, 9 Vitest tests at 78.28% statements/lines and 66.49% branches, and authenticated component journeys. |
 | 2026-07-31 | Phase 5 backend gates      | Passed: 37 tests including workspace-scoped audit history and cross-workspace denial; strict Ruff and mypy checks pass. Two upstream deprecation warnings remain.                              |
 | 2026-07-31 | Phase 5 browser gates      | Passed: 4 serial Chromium journeys covering signed-out protection, authenticated review/evidence/audit, public demo, mobile RTL, tablet responsiveness, and horizontal-overflow assertions.    |
+| 2026-07-31 | Phase 6 measured eval      | Passed: 12 fictional PDFs; fake-ai-v1 measured 100% classification, 99.07% fields, 100% recall@3/citation precision/unsupported handling, and one disclosed difficult-date failure.            |
+| 2026-07-31 | Phase 6 test gates         | Passed: 41 Python tests, 13 Vitest tests at 86.67% statements/lines and 69.44% branches, strict Ruff/mypy/TypeScript/ESLint, Prettier, and Next.js production build.                           |
+| 2026-07-31 | Phase 6 browser gates      | Passed: 5 serial Chromium journeys including fixture upload, signed-upload handshake, processing, correction, approval, audit, and simulated cross-workspace 404.                              |

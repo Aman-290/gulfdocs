@@ -17,6 +17,10 @@ def detect_language(text: str) -> str:
     arabic = sum("\u0600" <= character <= "\u06ff" for character in text)
     latin = sum(character.isascii() and character.isalpha() for character in text)
     if arabic and latin:
+        if arabic > latin * 3:
+            return "ar"
+        if latin > arabic * 3:
+            return "en"
         return "mixed"
     if arabic:
         return "ar"

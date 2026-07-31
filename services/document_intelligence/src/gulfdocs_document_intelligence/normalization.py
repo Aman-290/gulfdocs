@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from decimal import Decimal, InvalidOperation
 
 _WHITESPACE = re.compile(r"[\t\r\f\v ]+")
@@ -7,6 +8,7 @@ _MULTIPLE_NEWLINES = re.compile(r"\n{3,}")
 
 def normalize_page_text(value: str) -> str:
     """Normalize layout whitespace without transliterating or reshaping Arabic text."""
+    value = unicodedata.normalize("NFKC", value)
     lines = [_WHITESPACE.sub(" ", line).strip() for line in value.split("\n")]
     return _MULTIPLE_NEWLINES.sub("\n\n", "\n".join(lines)).strip()
 

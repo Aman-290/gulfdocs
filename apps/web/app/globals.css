@@ -1083,6 +1083,38 @@ a:focus-visible {
   padding-left: 18px;
   font-size: 13px;
 }
+.measured-report {
+  max-width: 980px;
+}
+.evaluation-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 28px 0;
+}
+.evaluation-metrics article {
+  display: grid;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: white;
+}
+.evaluation-metrics strong {
+  color: var(--teal);
+  font-family: Georgia, serif;
+  font-size: 29px;
+  font-weight: 500;
+}
+.evaluation-metrics span {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.evaluation-caveat {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
 .auth-page {
   display: grid;
   place-items: center;
@@ -2109,6 +2141,9 @@ a:focus-visible {
   }
   .empty-report ul {
     grid-template-columns: 1fr;
+  }
+  .evaluation-metrics {
+    grid-template-columns: 1fr 1fr;
   }
   .auth-card {
     padding: 30px 22px;

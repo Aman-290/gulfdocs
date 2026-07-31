@@ -83,7 +83,9 @@ function wrapper(children: React.ReactNode) {
 }
 
 describe("DocumentWorkspace", () => {
+  let documentStatus = "needs_review";
   beforeEach(() => {
+    documentStatus = "needs_review";
     let questionCreated = false;
     vi.stubGlobal("URL", {
       createObjectURL: () => "blob:pdf",
@@ -116,7 +118,11 @@ describe("DocumentWorkspace", () => {
           ]);
         if (url.endsWith("/approve"))
           return json({ ...document, status: "approved" });
-        return json(document);
+        if (url.endsWith("/retry")) {
+          documentStatus = "queued";
+          return json({ ...document, status: documentStatus });
+        }
+        return json({ ...document, status: documentStatus });
       }),
     );
   });
@@ -147,5 +153,17 @@ describe("DocumentWorkspace", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
     expect(await screen.findByText("processing completed")).toBeInTheDocument();
     expect(screen.getByText(/needs_review/)).toBeInTheDocument();
+  });
+
+  it("offers a retry action for a failed processing run", async () => {
+    documentStatus = "failed";
+    render(wrapper(<DocumentWorkspace documentId="doc-1" />));
+    fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/retry"),
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
   });
 });

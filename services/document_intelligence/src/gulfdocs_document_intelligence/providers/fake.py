@@ -35,22 +35,28 @@ class FakeAIProvider:
     ) -> StructuredExtraction:
         patterns = {
             "document_number": (
-                r"(?:invoice|quotation|purchase order|contract)\s*"
-                r"(?:number|no\.?|#)?\s*[:#-]?\s*([A-Z0-9][A-Z0-9/_-]+)"
+                r"(?:(?:invoice|quotation|purchase order|contract)\s*"
+                r"(?:number|no\.?|#)?|رقم (?:الفاتورة|عرض السعر|أمر الشراء|العقد|المستند))"
+                r"\s*[:#-]?\s*([A-Z0-9][A-Z0-9/_-]+)"
             ),
-            "supplier_name": r"(?:supplier|vendor)\s*[:\-]\s*([^\n]+)",
-            "customer_name": r"(?:customer|client)\s*[:\-]\s*([^\n]+)",
-            "buyer_name": r"(?:buyer|customer)\s*[:\-]\s*([^\n]+)",
-            "issue_date": r"(?:issue date|date)\s*[:\-]\s*(\d{4}-\d{2}-\d{2})",
-            "due_date": r"due date\s*[:\-]\s*(\d{4}-\d{2}-\d{2})",
+            "supplier_name": r"(?:supplier|vendor|المورد|البائع)\s*[:\-]\s*([^\n]+)",
+            "customer_name": r"(?:customer|client|العميل)\s*[:\-]\s*([^\n]+)",
+            "buyer_name": r"(?:buyer|customer|المشتري)\s*[:\-]\s*([^\n]+)",
+            "issue_date": (
+                r"(?:issue date|date|تاريخ الإصدار|التاريخ)\s*[:\-]\s*(\d{4}-\d{2}-\d{2})"
+            ),
+            "due_date": r"(?:due date|تاريخ الاستحقاق)\s*[:\-]\s*(\d{4}-\d{2}-\d{2})",
             "effective_date": r"effective date\s*[:\-]\s*(\d{4}-\d{2}-\d{2})",
             "expiry_date": r"(?:expiry|expiration) date\s*[:\-]\s*(\d{4}-\d{2}-\d{2})",
             "requested_delivery_date": r"requested delivery date\s*[:\-]\s*(\d{4}-\d{2}-\d{2})",
             "delivery_address": r"delivery address\s*[:\-]\s*([^\n]+)",
-            "currency": r"currency\s*[:\-]\s*(AED|USD|EUR)",
-            "subtotal": r"subtotal\s*[:\-]\s*([\d,.]+)",
-            "tax": r"(?:tax|vat)\s*[:\-]\s*([\d,.]+)",
-            "total": r"\b(?:grand\s+)?total\b\s*[:\-]\s*([\d,.]+)",
+            "currency": r"(?:currency|العملة)\s*[:\-]\s*(AED|USD|EUR)",
+            "subtotal": r"(?:subtotal|المجموع الفرعي)\s*[:\-]\s*([\d,.]+)",
+            "tax": r"(?:tax|vat|الضريبة)\s*[:\-]\s*([\d,.]+)",
+            "total": (
+                r"(?:(?<![A-Za-z])(?:grand\s+)?total(?![A-Za-z])|الإجمالي|المجموع الكلي)"
+                r"\s*[:\-]\s*([\d,.]+)"
+            ),
             "governing_law": r"governing law\s*[:\-]\s*([^\n]+)",
             "parties": r"parties\s*[:\-]\s*([^\n]+)",
             "title": r"(?:contract title|title)\s*[:\-]\s*([^\n]+)",
@@ -67,12 +73,37 @@ class FakeAIProvider:
                 continue
             page, value, excerpt = match
             parsed_value: str | list[str] = value.strip()
+            confidence = 0.98
+            if isinstance(parsed_value, str) and parsed_value.startswith("[LOW]"):
+                parsed_value = parsed_value.removeprefix("[LOW]").strip()
+                confidence = 0.55
             if key == "parties":
                 parsed_value = [part.strip() for part in re.split(r"[;,]", value) if part.strip()]
             fields[key] = ExtractedValue(
                 value=parsed_value,
-                confidence=0.98,
+                confidence=confidence,
                 citations=[Citation(page=page, excerpt=excerpt[:500])],
+            )
+        line_items: list[dict[str, str]] = []
+        line_citations: list[Citation] = []
+        for page_number, text in enumerate(page_text, start=1):
+            for line_match in re.finditer(
+                r"(?:ITEM|بند)\|([^|\n]+)\|([\d.]+)\|([\d,.]+)\|([\d,.]+)", text, re.I
+            ):
+                line_items.append(
+                    {
+                        "description": line_match.group(1).strip(),
+                        "quantity": line_match.group(2),
+                        "unit_price": line_match.group(3),
+                        "line_total": line_match.group(4),
+                    }
+                )
+                line_citations.append(Citation(page=page_number, excerpt=line_match.group(0)[:500]))
+        if line_items:
+            fields["line_items"] = ExtractedValue(
+                value=line_items,
+                confidence=0.98,
+                citations=line_citations,
             )
         return StructuredExtraction(document_type=document_type, fields=fields)
 

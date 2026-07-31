@@ -1,0 +1,26 @@
+{
+  "generated_at": "2026-07-31T14:17:01.894431+00:00",
+  "provider": "fake",
+  "model_version": "fake-ai-v1",
+  "dataset_version": "2026-07-31.1",
+  "notes": "Measured before correcting the deterministic total-field boundary matcher.",
+  "metrics": {
+    "document_classification_accuracy": 1.0,
+    "field_level_extraction_accuracy": 0.9259,
+    "identifier_exact_match": 1.0,
+    "normalized_numeric_accuracy": 0.7812,
+    "normalized_date_accuracy": 0.9474,
+    "line_item_extraction_accuracy": 1.0,
+    "expected_issue_detection_rate": 0.875,
+    "arithmetic_error_detection_rate": 1.0,
+    "retrieval_recall_at_3": 1.0,
+    "citation_precision": 1.0,
+    "unsupported_answer_rate": 1.0,
+    "pdf_page_count_accuracy": 1.0,
+    "pdf_language_detection_accuracy": 0.75,
+    "median_latency_ms": 43.863,
+    "p95_latency_ms": 290.115,
+    "measured_token_usage": 913,
+    "estimated_api_cost_usd": 0.0
+  }
+}

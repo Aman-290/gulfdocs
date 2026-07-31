@@ -1,0 +1,82 @@
+{
+  "report_version": "1.0",
+  "dataset_version": "2026-07-31.1",
+  "generated_at": "2026-07-31T14:19:49.945337+00:00",
+  "suite": "all",
+  "case_count": 12,
+  "provider": "fake",
+  "model_version": "fake-ai-v1",
+  "embedding_model_version": "fake-sha256-768",
+  "prompt_version": "fake-grounding-v1",
+  "parser_version": "PyMuPDF-1.28.0+schema-2026-07-30.1",
+  "token_measurement": "whitespace-token approximation",
+  "metrics": {
+    "document_classification_accuracy": 1.0,
+    "field_level_extraction_accuracy": 0.9907,
+    "identifier_exact_match": 1.0,
+    "normalized_numeric_accuracy": 1.0,
+    "normalized_date_accuracy": 0.9474,
+    "line_item_extraction_accuracy": 1.0,
+    "expected_issue_detection_rate": 1.0,
+    "arithmetic_error_detection_rate": 1.0,
+    "retrieval_recall_at_3": 1.0,
+    "citation_precision": 1.0,
+    "unsupported_answer_rate": 1.0,
+    "pdf_page_count_accuracy": 1.0,
+    "pdf_language_detection_accuracy": 1.0,
+    "median_latency_ms": 31.922,
+    "p95_latency_ms": 85.014,
+    "measured_token_usage": 1037,
+    "estimated_api_cost_usd": 0.0
+  },
+  "language_slices": {
+    "ar": {
+      "classification_accuracy": 1.0,
+      "field_extraction_accuracy": 1.0,
+      "case_count": 1
+    },
+    "en": {
+      "classification_accuracy": 1.0,
+      "field_extraction_accuracy": 0.9875,
+      "case_count": 9
+    },
+    "mixed": {
+      "classification_accuracy": 1.0,
+      "field_extraction_accuracy": 1.0,
+      "case_count": 2
+    }
+  },
+  "failures": [
+    {
+      "case_id": "difficult-date-format",
+      "metric": "field_extraction",
+      "field": "issue_date",
+      "expected": "2026-11-24",
+      "actual": null
+    }
+  ],
+  "baseline_comparison": {
+    "available": true,
+    "baseline_generated_at": "2026-07-31T14:17:01.894431+00:00",
+    "deltas": {
+      "document_classification_accuracy": 0.0,
+      "field_level_extraction_accuracy": 0.0648,
+      "identifier_exact_match": 0.0,
+      "normalized_numeric_accuracy": 0.2188,
+      "normalized_date_accuracy": 0.0,
+      "line_item_extraction_accuracy": 0.0,
+      "expected_issue_detection_rate": 0.125,
+      "arithmetic_error_detection_rate": 0.0,
+      "retrieval_recall_at_3": 0.0,
+      "citation_precision": 0.0,
+      "unsupported_answer_rate": 0.0,
+      "pdf_page_count_accuracy": 0.0,
+      "pdf_language_detection_accuracy": 0.25,
+      "median_latency_ms": -11.941,
+      "p95_latency_ms": -205.101,
+      "measured_token_usage": 124.0,
+      "estimated_api_cost_usd": 0.0
+    }
+  },
+  "fictional_data_only": true
+}

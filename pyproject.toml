@@ -38,6 +38,7 @@ markers = [
   "integration: requires the local PostgreSQL service and migrated schema",
 ]
 testpaths = [
+  "evaluation/tests",
   "apps/api/tests",
   "apps/worker/tests",
   "services/document_intelligence/tests",
