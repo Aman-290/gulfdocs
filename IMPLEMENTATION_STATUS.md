@@ -57,12 +57,12 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 
 ## Phase 4 — Hybrid retrieval and grounded Q&A
 
-- [ ] Implement page-aware chunking and embedding persistence.
-- [ ] Implement workspace/document-filtered PostgreSQL full-text and pgvector retrieval.
-- [ ] Implement reciprocal-rank fusion with retrieval tests and documented bilingual limitations.
-- [ ] Build bounded grounded-answer context with only retrieved pages.
-- [ ] Return evidence-backed answers with page citations/excerpts or the explicit unsupported response.
-- [ ] Add question/document/user limits, latency/model/token metadata, and privacy-safe logging.
+- [x] Implement page-aware chunking and 768-dimension embedding persistence.
+- [x] Implement workspace/document-filtered PostgreSQL full-text and pgvector cosine retrieval.
+- [x] Implement reciprocal-rank fusion with deterministic tests and documented bilingual limitations.
+- [x] Build bounded grounded-answer context containing only retrieved page chunks.
+- [x] Return evidence-backed answers with verified page citations/excerpts or the explicit unsupported response.
+- [x] Add per-document/per-user question limits, latency/model/prompt/token/retrieval metadata, hashed questions, and privacy-safe logging.
 - [x] Add precomputed public-demo answers to keep the anonymous demo useful without Gemini quota.
 
 ## Phase 5 — Complete bilingual product experience
@@ -141,3 +141,4 @@ Only real results belong here.
 | 2026-07-30 | Phase 3 domain tests       | Passed: 20 document-intelligence tests covering page boundaries, bilingual detection, citations, arithmetic mismatch, injection signals, and 768-dimension embeddings. |
 | 2026-07-31 | Dedicated GCP selection    | Passed: `gulfdocs` / `192591567730` is active, billing-enabled, selected in gcloud, and owned by the authenticated development account.          |
 | 2026-07-31 | Phase 3 complete           | Passed: 36 backend tests including persistent worker processing/replay/failure, pgvector indexing, corrections, approval, revisions, and audits; Ruff, mypy, and Alembic drift checks passed. |
+| 2026-07-31 | Phase 4 complete           | Passed: 37 backend tests including RRF ordering, bounded context, PostgreSQL FTS/pgvector retrieval, cited answers, unsupported answers, history, and cross-workspace Q&A denial. |

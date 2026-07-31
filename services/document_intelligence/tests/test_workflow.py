@@ -1,4 +1,5 @@
 from pathlib import Path
+from uuid import uuid4
 
 import fitz
 import pytest
@@ -6,6 +7,11 @@ from gulfdocs_document_intelligence.extraction import ExtractedValue, Structured
 from gulfdocs_document_intelligence.models import Citation, DocumentType
 from gulfdocs_document_intelligence.parsing import detect_language, parse_pdf_pages
 from gulfdocs_document_intelligence.providers import FakeAIProvider
+from gulfdocs_document_intelligence.retrieval import (
+    RetrievalCandidate,
+    bounded_page_context,
+    reciprocal_rank_fusion,
+)
 from gulfdocs_document_intelligence.validation import validate_extraction
 from gulfdocs_document_intelligence.workflow import DeterministicDocumentWorkflow
 
@@ -94,3 +100,19 @@ def test_due_date_before_issue_date_is_blocking() -> None:
         },
     )
     assert "DATE_ORDER_INVALID" in {issue.code for issue in validate_extraction(extraction)}
+
+
+def test_rrf_merges_rankings_deterministically_and_bounds_context() -> None:
+    shared = uuid4()
+    lexical_only = uuid4()
+    lexical = [
+        RetrievalCandidate(shared, 2, "Payment terms are Net 30.", "en", 1, "fts", 0.8),
+        RetrievalCandidate(lexical_only, 1, "Invoice header", "en", 2, "fts", 0.5),
+    ]
+    semantic = [
+        RetrievalCandidate(shared, 2, "Payment terms are Net 30.", "en", 1, "semantic", 0.9)
+    ]
+    fused = reciprocal_rank_fusion([lexical, semantic])
+    assert fused[0].chunk_id == shared
+    assert fused[0].sources == ("fts", "semantic")
+    assert bounded_page_context(fused, maximum_characters=12) == [(2, "Payment term")]

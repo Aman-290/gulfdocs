@@ -305,6 +305,34 @@ def test_persistent_worker_correction_approval_and_replay(client: TestClient) ->
     )
     assert approved.status_code == 200, approved.text
     assert approved.json()["status"] == "approved"
+    answer = client.post(
+        f"/api/v1/documents/{presigned['document_id']}/questions",
+        headers={"Authorization": "Bearer dev:alice"},
+        json={"question": "What is the total?"},
+    )
+    assert answer.status_code == 201, answer.text
+    assert answer.json()["supported"] is True
+    assert answer.json()["citations"][0]["page"] == 1
+    unauthorized_answer = client.post(
+        f"/api/v1/documents/{presigned['document_id']}/questions",
+        headers={"Authorization": "Bearer dev:bob"},
+        json={"question": "What is the total?"},
+    )
+    assert unauthorized_answer.status_code == 404
+    history = client.get(
+        f"/api/v1/documents/{presigned['document_id']}/questions",
+        headers={"Authorization": "Bearer dev:alice"},
+    )
+    assert history.status_code == 200
+    assert len(history.json()) == 1
+    unsupported = client.post(
+        f"/api/v1/documents/{presigned['document_id']}/questions",
+        headers={"Authorization": "Bearer dev:alice"},
+        json={"question": "Who won the football championship?"},
+    )
+    assert unsupported.status_code == 201
+    assert unsupported.json()["supported"] is False
+    assert unsupported.json()["citations"] == []
     with psycopg.connect(_sync_database_url()) as connection:
         counts = connection.execute(
             "SELECT "

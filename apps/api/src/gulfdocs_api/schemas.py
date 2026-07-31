@@ -84,3 +84,18 @@ class CorrectExtractionRequest(BaseModel):
 
 class ApproveDocumentRequest(BaseModel):
     notes: str | None = Field(default=None, max_length=2_000)
+
+
+class PrivateQuestionRequest(BaseModel):
+    question: str = Field(min_length=3, max_length=500)
+
+
+class PrivateAnswerResponse(BaseModel):
+    question_id: UUID
+    answer: str
+    citations: list[dict[str, Any]]
+    supported: bool
+    model_name: str
+    prompt_version: str
+    latency_ms: int
+    created_at: datetime

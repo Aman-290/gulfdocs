@@ -1,5 +1,8 @@
+import hashlib
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
+from time import monotonic
 from typing import Annotated
 from urllib.parse import quote
 from uuid import UUID, uuid4
@@ -9,9 +12,25 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse
 from gulfdocs_document_intelligence.adapters.local import LocalFileStorage
 from gulfdocs_document_intelligence.models import DocumentStatus
+from gulfdocs_document_intelligence.providers import FakeAIProvider, GeminiProvider
+from gulfdocs_document_intelligence.providers.ports import AIProvider
 from gulfdocs_document_intelligence.repositories import DocumentRecord
+from gulfdocs_document_intelligence.retrieval import (
+    bounded_page_context,
+    lexical_search_query,
+    reciprocal_rank_fusion,
+)
+from gulfdocs_persistence.models import (
+    AuditEvent,
+    Document,
+    DocumentAnswer,
+    DocumentQuestion,
+    LLMUsageEvent,
+)
 from gulfdocs_persistence.repositories import SqlAlchemyDocumentRepository
+from gulfdocs_persistence.retrieval import SqlAlchemyRetrievalRepository
 from gulfdocs_persistence.review import SqlAlchemyReviewRepository
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..cloud_adapters import (
@@ -31,6 +50,8 @@ from ..schemas import (
     ExtractionResponse,
     PresignUploadRequest,
     PresignUploadResponse,
+    PrivateAnswerResponse,
+    PrivateQuestionRequest,
     ValidationIssueResponse,
 )
 from ..upload_service import (
@@ -42,6 +63,20 @@ from ..upload_service import (
 )
 
 router = APIRouter(prefix="/api/v1", tags=["documents"])
+
+
+def _ai_provider(settings: Settings) -> AIProvider:
+    if settings.ai_provider == "fake":
+        return FakeAIProvider()
+    if settings.ai_provider == "gemini":
+        return GeminiProvider(
+            model_name=settings.gemini_extraction_model,
+            embedding_model=settings.gemini_embedding_model,
+            api_key=settings.gemini_api_key,
+            project=settings.gcp_project_id or None,
+            location=settings.gcp_region,
+        )
+    raise RuntimeError(f"Unsupported AI provider: {settings.ai_provider}")
 
 
 def _response(document: DocumentRecord) -> DocumentResponse:
@@ -453,3 +488,140 @@ async def approve_document(
         created_at=document.created_at,
         updated_at=document.updated_at,
     )
+
+
+@router.post(
+    "/documents/{document_id}/questions",
+    response_model=PrivateAnswerResponse,
+    status_code=201,
+)
+async def ask_document(
+    document_id: UUID,
+    payload: PrivateQuestionRequest,
+    request: Request,
+    context: Authorized,
+) -> PrivateAnswerResponse:
+    settings = get_settings()
+    document = await context.session.scalar(
+        select(Document).where(
+            Document.id == document_id,
+            Document.workspace_id == context.identity.workspace_id,
+            Document.status.in_(("ready", "needs_review", "approved")),
+        )
+    )
+    if document is None:
+        raise HTTPException(status_code=404, detail="Queryable document was not found")
+    repository = SqlAlchemyRetrievalRepository(context.session)
+    allowed = await repository.consume_question_allowance(
+        context.identity,
+        document_id,
+        maximum_daily=settings.max_questions_per_user_per_day,
+        maximum_document=settings.max_questions_per_document,
+    )
+    if not allowed:
+        raise HTTPException(status_code=429, detail="Question limit reached")
+    started = monotonic()
+    provider = _ai_provider(settings)
+    lexical = await repository.full_text_search(
+        workspace_id=context.identity.workspace_id,
+        document_id=document_id,
+        query=lexical_search_query(payload.question) or payload.question,
+    )
+    embedding = (await provider.embed([payload.question]))[0]
+    semantic = await repository.semantic_search(
+        workspace_id=context.identity.workspace_id,
+        document_id=document_id,
+        embedding=embedding,
+    )
+    fused = reciprocal_rank_fusion([lexical, semantic])
+    bounded = bounded_page_context(fused, maximum_characters=settings.max_retrieved_context_chars)
+    answer = await provider.answer(payload.question, bounded)
+    latency_ms = int((monotonic() - started) * 1000)
+    question = DocumentQuestion(
+        workspace_id=context.identity.workspace_id,
+        document_id=document_id,
+        actor_id=context.identity.user_id,
+        question_hash=hashlib.sha256(payload.question.encode()).hexdigest(),
+    )
+    context.session.add(question)
+    await context.session.flush()
+    token_usage = max(0, len(answer.answer.split()))
+    stored = DocumentAnswer(
+        question_id=question.id,
+        answer=answer.answer,
+        supported=answer.supported,
+        citations=[citation.model_dump(mode="json") for citation in answer.citations],
+        retrieval_metadata={
+            "chunk_ids": [str(chunk.chunk_id) for chunk in fused],
+            "pages": sorted({chunk.page_number for chunk in fused}),
+            "fusion": "rrf",
+        },
+        model_name=answer.model_name,
+        prompt_version=answer.prompt_version,
+        token_usage=token_usage,
+        latency_ms=latency_ms,
+    )
+    context.session.add_all(
+        [
+            stored,
+            LLMUsageEvent(
+                workspace_id=context.identity.workspace_id,
+                document_id=document_id,
+                purpose="grounded_qa",
+                model_name=answer.model_name,
+                input_tokens=sum(len(text.split()) for _, text in bounded),
+                output_tokens=token_usage,
+                estimated_cost_usd=Decimal("0") if settings.ai_provider == "fake" else None,
+            ),
+            AuditEvent(
+                event_type="question_submitted",
+                actor_id=context.identity.user_id,
+                workspace_id=context.identity.workspace_id,
+                document_id=document_id,
+                request_id=request.state.request_id,
+                safe_metadata={"supported": answer.supported, "retrieved_chunks": len(fused)},
+            ),
+        ]
+    )
+    await context.session.flush()
+    return PrivateAnswerResponse(
+        question_id=question.id,
+        answer=stored.answer,
+        citations=stored.citations,
+        supported=stored.supported,
+        model_name=stored.model_name,
+        prompt_version=answer.prompt_version,
+        latency_ms=stored.latency_ms,
+        created_at=stored.created_at,
+    )
+
+
+@router.get("/documents/{document_id}/questions", response_model=list[PrivateAnswerResponse])
+async def list_questions(document_id: UUID, context: Authorized) -> list[PrivateAnswerResponse]:
+    rows = (
+        await context.session.execute(
+            select(DocumentQuestion, DocumentAnswer)
+            .join(DocumentAnswer, DocumentAnswer.question_id == DocumentQuestion.id)
+            .join(Document, Document.id == DocumentQuestion.document_id)
+            .where(
+                DocumentQuestion.document_id == document_id,
+                DocumentQuestion.workspace_id == context.identity.workspace_id,
+                Document.workspace_id == context.identity.workspace_id,
+            )
+            .order_by(DocumentQuestion.created_at.desc())
+            .limit(100)
+        )
+    ).all()
+    return [
+        PrivateAnswerResponse(
+            question_id=question.id,
+            answer=answer.answer,
+            citations=answer.citations,
+            supported=answer.supported,
+            model_name=answer.model_name,
+            prompt_version=answer.prompt_version,
+            latency_ms=answer.latency_ms,
+            created_at=answer.created_at,
+        )
+        for question, answer in rows
+    ]

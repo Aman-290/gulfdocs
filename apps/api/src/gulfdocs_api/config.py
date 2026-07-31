@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     max_uploads_per_user_per_day: int = 5
     max_questions_per_user_per_day: int = 20
     max_questions_per_document: int = 20
+    max_generated_tokens: int = 800
+    max_retrieved_context_chars: int = 16_000
+    ai_provider: str = "fake"
+    gemini_api_key: str | None = None
+    gemini_extraction_model: str = "gemini-3.5-flash-lite"
+    gemini_embedding_model: str = "gemini-embedding-001"
 
 
 @lru_cache

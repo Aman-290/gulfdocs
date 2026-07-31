@@ -332,6 +332,7 @@ class DocumentAnswer(Base):
     citations: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     retrieval_metadata: Mapped[dict[str, Any]] = mapped_column(JSONB)
     model_name: Mapped[str] = mapped_column(String(120))
+    prompt_version: Mapped[str] = mapped_column(String(80))
     token_usage: Mapped[int] = mapped_column(Integer)
     latency_ms: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
