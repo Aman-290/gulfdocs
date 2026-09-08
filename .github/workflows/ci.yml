@@ -91,7 +91,7 @@ jobs:
           pnpm audit --audit-level high
           uv export --frozen --no-dev --no-emit-workspace --output-file .ci-requirements.txt
           uvx pip-audit --requirement .ci-requirements.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-reports
