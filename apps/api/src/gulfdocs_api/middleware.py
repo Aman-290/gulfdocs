@@ -7,6 +7,8 @@ import structlog
 from fastapi import Request, Response
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
+from .config import get_settings
+
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 logger = structlog.get_logger(__name__)
 
@@ -22,6 +24,12 @@ async def request_context_middleware(
     started = perf_counter()
     response = await call_next(request)
     response.headers["x-request-id"] = request_id
+    response.headers["x-content-type-options"] = "nosniff"
+    response.headers["x-frame-options"] = "DENY"
+    response.headers["referrer-policy"] = "no-referrer"
+    response.headers["permissions-policy"] = "camera=(), microphone=(), geolocation=()"
+    if get_settings().app_env == "production":
+        response.headers["strict-transport-security"] = "max-age=31536000; includeSubDomains"
     await logger.ainfo(
         "http_request_completed",
         status_code=response.status_code,

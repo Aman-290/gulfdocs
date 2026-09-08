@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field
 
 from .config import WorkerSettings, get_worker_settings
 from .processor import PersistentDocumentProcessor, ProcessingTask
+from .retention import RetentionCleanup
+from .telemetry import configure_telemetry
 
 
 def configure_logging(level: str) -> None:
@@ -42,6 +44,12 @@ class TaskResult(BaseModel):
     idempotent_replay: bool
 
 
+class CleanupResult(BaseModel):
+    status: str
+    purged_documents: int
+    failed_documents: int
+
+
 settings = get_worker_settings()
 configure_logging(settings.log_level)
 logger = structlog.get_logger(__name__)
@@ -52,6 +60,7 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
+configure_telemetry(app, settings.otel_exporter_otlp_endpoint)
 _completed_runs: set[UUID] = set()
 
 
@@ -155,4 +164,23 @@ async def process_document(task: ProcessDocumentTask) -> TaskResult:
         document_id=task.document_id,
         processing_run_id=task.processing_run_id,
         idempotent_replay=replay,
+    )
+
+
+@app.post(
+    "/internal/retention/cleanup",
+    response_model=CleanupResult,
+    dependencies=[Depends(require_worker_identity)],
+)
+async def cleanup_retention() -> CleanupResult:
+    outcome = await RetentionCleanup(settings).run()
+    await logger.ainfo(
+        "retention_cleanup_completed",
+        purged_documents=outcome.purged_documents,
+        failed_documents=outcome.failed_documents,
+    )
+    return CleanupResult(
+        status="completed" if not outcome.failed_documents else "completed_with_failures",
+        purged_documents=outcome.purged_documents,
+        failed_documents=outcome.failed_documents,
     )

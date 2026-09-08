@@ -61,6 +61,7 @@ class QueueConfiguration:
     queue: str
     worker_url: str
     invoker_service_account: str
+    oidc_audience: str = ""
 
 
 class CloudTasksQueueAdapter:
@@ -108,7 +109,7 @@ class CloudTasksQueueAdapter:
                 "body": payload,
                 "oidc_token": {
                     "service_account_email": self.configuration.invoker_service_account,
-                    "audience": self.configuration.worker_url,
+                    "audience": self.configuration.oidc_audience or self.configuration.worker_url,
                 },
             },
         }

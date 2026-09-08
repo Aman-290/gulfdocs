@@ -9,8 +9,10 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     log_level: str = "INFO"
+    otel_exporter_otlp_endpoint: str = ""
     allowed_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     public_demo_enabled: bool = True
+    public_demo_requests_per_minute: int = 60
     database_url: str = "postgresql+psycopg://gulfdocs:gulfdocs@localhost:55432/gulfdocs"
     auth_provider: str = "development"
     storage_provider: str = "local"
@@ -23,6 +25,7 @@ class Settings(BaseSettings):
     gcs_bucket: str = ""
     cloud_tasks_queue: str = ""
     cloud_tasks_worker_url: str = ""
+    cloud_tasks_oidc_audience: str = ""
     cloud_tasks_invoker_service_account: str = ""
     max_pdf_size_bytes: int = 10 * 1024 * 1024
     max_document_pages: int = 50

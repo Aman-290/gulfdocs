@@ -1,4 +1,5 @@
 # Machine-generated measured reports preserve evaluator serialization.
 evaluation/results/
+docs/openapi.json
 # Alembic's extensionless generated README is not a Prettier document.
 migrations/README

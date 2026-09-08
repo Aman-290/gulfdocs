@@ -62,6 +62,10 @@ export function Dashboard() {
           )
         : false,
   });
+  const metrics = useQuery({
+    queryKey: ["metrics"],
+    queryFn: () => api.getMetrics(),
+  });
   const upload = useMutation({
     mutationFn: (file: File) => api.upload(file, setUploadProgress),
     onSuccess: async () => {
@@ -107,9 +111,11 @@ export function Dashboard() {
   const ready = (documents.data || []).filter((document) =>
     ["ready", "approved"].includes(document.status),
   ).length;
-  const needsReview = (documents.data || []).filter(
-    (document) => document.status === "needs_review",
-  ).length;
+  const needsReview =
+    metrics.data?.quality.needs_review_documents ??
+    (documents.data || []).filter(
+      (document) => document.status === "needs_review",
+    ).length;
   const bytes = (documents.data || []).reduce(
     (sum, document) => sum + (document.size_bytes || 0),
     0,
@@ -163,26 +169,49 @@ export function Dashboard() {
         <article>
           <FileText />
           <span>
-            <strong>{documents.data?.length || 0}</strong>Documents
+            <strong>
+              {metrics.data?.quality.total_documents ??
+                documents.data?.length ??
+                0}
+            </strong>
+            Documents
           </span>
         </article>
         <article>
           <Gauge />
           <span>
             <strong>{ready}</strong>Ready or approved
+            <small>
+              {metrics.data?.quality.p95_processing_ms
+                ? `p95 ${Math.round(metrics.data.quality.p95_processing_ms)} ms`
+                : "Processing timing pending"}
+            </small>
           </span>
         </article>
         <article>
           <AlertCircle />
           <span>
             <strong>{needsReview}</strong>Need review
+            <small>
+              {metrics.data
+                ? `${Math.round(metrics.data.quality.failure_rate * 100)}% failure rate`
+                : "Quality summary loading"}
+            </small>
           </span>
         </article>
         <article>
           <UploadCloud />
           <span>
-            <strong>{uploadedToday} / 5</strong>Daily uploads ·{" "}
-            {readableBytes(bytes)} stored
+            <strong>
+              {metrics.data?.usage.uploads_used ?? uploadedToday} /{" "}
+              {metrics.data?.usage.uploads_limit ?? 5}
+            </strong>
+            Daily uploads · {readableBytes(bytes)} stored
+            <small>
+              {metrics.data
+                ? `${metrics.data.usage.questions_used}/${metrics.data.usage.questions_limit} questions · ${metrics.data.usage.generated_tokens} tokens`
+                : "Usage summary loading"}
+            </small>
           </span>
         </article>
       </section>

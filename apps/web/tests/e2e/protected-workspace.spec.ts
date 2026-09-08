@@ -13,6 +13,30 @@ const document = {
   updated_at: "2026-07-31T08:02:00Z",
 };
 
+const metrics = {
+  generated_at: "2026-07-31T08:03:00Z",
+  usage: {
+    usage_date: "2026-07-31",
+    uploads_used: 1,
+    uploads_limit: 5,
+    questions_used: 1,
+    questions_limit: 20,
+    generated_tokens: 20,
+  },
+  quality: {
+    total_documents: 1,
+    failed_documents: 0,
+    needs_review_documents: 1,
+    approved_documents: 0,
+    failure_rate: 0,
+    needs_review_rate: 1,
+    average_processing_ms: 120,
+    median_processing_ms: 120,
+    p95_processing_ms: 120,
+  },
+  daily_tokens: [],
+};
+
 test("private workspace redirects signed-out users", async ({ page }) => {
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/signin$/);
@@ -27,6 +51,8 @@ test("reviewer opens a private document and sees grounded evidence", async ({
   );
   await page.route("http://localhost:8000/**", async (route) => {
     const url = route.request().url();
+    if (url.endsWith("/metrics/summary"))
+      return route.fulfill({ json: metrics });
     if (url.endsWith("/api/v1/documents"))
       return route.fulfill({ json: [document] });
     if (url.endsWith("/download"))
@@ -115,6 +141,8 @@ test("reviewer uploads, observes processing, corrects, approves, and verifies is
   await page.route("http://localhost:8000/**", async (route) => {
     const request = route.request();
     const url = request.url();
+    if (url.endsWith("/metrics/summary"))
+      return route.fulfill({ json: metrics });
     if (url.endsWith("/signed-upload")) {
       return route.fulfill({
         status: 204,

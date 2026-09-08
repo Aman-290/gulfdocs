@@ -1,5 +1,9 @@
+import pytest
+from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
+from gulfdocs_api.config import get_settings
 from gulfdocs_api.main import app
+from gulfdocs_api.rate_limit import FixedWindowLimiter
 from gulfdocs_document_intelligence.demo_data import DEMO_DOCUMENT_ID
 
 
@@ -9,6 +13,9 @@ def test_health_and_correlation_id() -> None:
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "gulfdocs-api", "version": "0.1.0"}
     assert response.headers["x-request-id"] == "test-request-001"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
 
 
 def test_public_demo_is_synthetic_and_precomputed() -> None:
@@ -53,3 +60,19 @@ def test_validation_errors_do_not_expose_stack_traces() -> None:
     assert response.status_code == 422
     assert body["detail"] == "The request did not match the expected schema."
     assert "traceback" not in str(body).casefold()
+
+
+async def test_public_demo_limiter_returns_retryable_429() -> None:
+    settings = get_settings()
+    original_limit = settings.public_demo_requests_per_minute
+    settings.public_demo_requests_per_minute = 1
+    limiter = FixedWindowLimiter()
+    request = Request({"type": "http", "client": ("203.0.113.9", 443)})
+    try:
+        await limiter(request)
+        with pytest.raises(HTTPException) as raised:
+            await limiter(request)
+    finally:
+        settings.public_demo_requests_per_minute = original_limit
+    assert raised.value.status_code == 429
+    assert raised.value.headers == {"Retry-After": "60"}

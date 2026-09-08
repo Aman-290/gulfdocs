@@ -13,6 +13,7 @@ from gulfdocs_api.main import app
 from gulfdocs_persistence.database import create_engine
 from gulfdocs_worker.config import WorkerSettings
 from gulfdocs_worker.processor import PersistentDocumentProcessor, ProcessingTask
+from gulfdocs_worker.retention import RetentionCleanup
 from sqlalchemy import text
 
 pytestmark = pytest.mark.integration
@@ -331,9 +332,7 @@ def test_persistent_worker_correction_approval_and_replay(client: TestClient) ->
     )
     assert audit.status_code == 200
     event_types = {event["event_type"] for event in audit.json()}
-    assert {"extraction_corrected", "document_approved", "question_submitted"}.issubset(
-        event_types
-    )
+    assert {"extraction_corrected", "document_approved", "question_submitted"}.issubset(event_types)
     assert all("document_text" not in event["safe_metadata"] for event in audit.json())
     unauthorized_audit = client.get(
         f"/api/v1/documents/{presigned['document_id']}/audit",
@@ -357,6 +356,93 @@ def test_persistent_worker_correction_approval_and_replay(client: TestClient) ->
             (presigned["document_id"],),
         ).fetchone()
     assert counts is not None and counts[0] == 1 and counts[1] == 1 and counts[2] >= 1
+
+    metrics = client.get(
+        "/api/v1/metrics/summary",
+        headers={"Authorization": "Bearer dev:alice"},
+    )
+    assert metrics.status_code == 200, metrics.text
+    assert metrics.json()["quality"]["total_documents"] == 1
+    assert metrics.json()["quality"]["approved_documents"] == 1
+    assert metrics.json()["quality"]["p95_processing_ms"] is not None
+    assert metrics.json()["usage"]["questions_used"] == 2
+    assert sum(day["tokens"] for day in metrics.json()["daily_tokens"]) > 0
+
+
+def test_retention_cleanup_purges_content_and_preserves_safe_audit(client: TestClient) -> None:
+    content = _invoice_pdf_bytes()
+    presigned = _presign(client, "alice", content, "alice-retention-001")
+    client.put(
+        str(presigned["upload_url"]),
+        headers={"Content-Type": "application/pdf"},
+        content=content,
+    )
+    client.post(
+        "/api/v1/uploads/complete",
+        headers={"Authorization": "Bearer dev:alice"},
+        json={"document_id": presigned["document_id"]},
+    )
+    with psycopg.connect(_sync_database_url()) as connection:
+        run = connection.execute(
+            "SELECT r.id, r.correlation_id, r.attempt, d.storage_key "
+            "FROM document_processing_runs r JOIN documents d ON d.id = r.document_id "
+            "WHERE d.id = %s",
+            (presigned["document_id"],),
+        ).fetchone()
+    assert run is not None
+    worker_settings = WorkerSettings(
+        database_url=get_settings().database_url,
+        storage_provider="local",
+        local_storage_root=get_settings().local_storage_root,
+        ai_provider="fake",
+        document_retention_days=30,
+    )
+    task = ProcessingTask(
+        document_id=UUID(str(presigned["document_id"])),
+        processing_run_id=run[0],
+        correlation_id=run[1],
+        attempt=run[2],
+    )
+    with asyncio.Runner(
+        loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector())
+    ) as runner:
+        runner.run(PersistentDocumentProcessor(worker_settings).process(task))
+    object_path = Path(get_settings().local_storage_root) / run[3]
+    assert object_path.exists()
+    with psycopg.connect(_sync_database_url()) as connection:
+        connection.execute(
+            "UPDATE documents SET updated_at = now() - interval '31 days' WHERE id = %s",
+            (presigned["document_id"],),
+        )
+        connection.commit()
+    with asyncio.Runner(
+        loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector())
+    ) as runner:
+        outcome = runner.run(RetentionCleanup(worker_settings).run())
+    assert outcome.purged_documents == 1
+    assert outcome.failed_documents == 0
+    assert not object_path.exists()
+    with psycopg.connect(_sync_database_url()) as connection:
+        row = connection.execute(
+            "SELECT status, storage_key, original_filename FROM documents WHERE id = %s",
+            (presigned["document_id"],),
+        ).fetchone()
+        content_counts = connection.execute(
+            "SELECT "
+            "(SELECT count(*) FROM document_pages WHERE document_id = %s), "
+            "(SELECT count(*) FROM document_chunks WHERE document_id = %s), "
+            "(SELECT count(*) FROM extracted_results WHERE document_id = %s), "
+            "(SELECT count(*) FROM document_uploads WHERE document_id = %s)",
+            (presigned["document_id"],) * 4,
+        ).fetchone()
+        audit = connection.execute(
+            "SELECT safe_metadata FROM audit_events "
+            "WHERE document_id = %s AND event_type = 'retention_purged'",
+            (presigned["document_id"],),
+        ).fetchone()
+    assert row == ("deleted", None, "retention-purged.pdf")
+    assert content_counts == (0, 0, 0, 0)
+    assert audit is not None and audit[0] == {"policy_days": 30}
 
 
 def test_persistent_worker_records_non_retryable_storage_failure(client: TestClient) -> None:

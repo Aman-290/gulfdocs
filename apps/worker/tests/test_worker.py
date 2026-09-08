@@ -16,6 +16,12 @@ def test_worker_rejects_public_unauthenticated_invocation() -> None:
     assert response.status_code == 401
 
 
+def test_retention_endpoint_rejects_public_unauthenticated_invocation() -> None:
+    with TestClient(app) as client:
+        response = client.post("/internal/retention/cleanup")
+    assert response.status_code == 401
+
+
 def test_development_task_delivery_is_identifier_only_and_idempotent() -> None:
     payload = {
         "document_id": str(uuid4()),

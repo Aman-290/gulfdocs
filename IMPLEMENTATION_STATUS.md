@@ -12,9 +12,10 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 - [x] Audit required CLIs and versions without exposing secret values.
 - [x] Detect authenticated GitHub, Google Cloud, and Firebase accounts.
 - [x] Refuse to reuse the unrelated active GCP project `solarsaas-ff521`.
-- [!] Terraform CLI is not installed; Terraform sources can still be authored and validated later in CI or after local installation.
-- [x] Select and verify dedicated billing-enabled GCP project `gulfdocs` (`192591567730`) and set it as the active CLI project.
-- [!] The selected GCP project is not yet Firebase-enabled, and no deployed PostgreSQL connection is configured.
+- [x] Install Terraform CLI 1.15.8 and validate the version-pinned configuration with Google provider 7.42.0.
+- [x] Select and verify a dedicated billing-enabled GCP project and set it as the active CLI project without committing its identifiers.
+- [x] Register the selected GCP project with Firebase, create the Web app, and initialize secure email/password Authentication.
+- [!] No deployed PostgreSQL connection is configured.
 
 ## Phase 1 — Monorepo foundation and local vertical slice
 
@@ -86,14 +87,14 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 
 ## Phase 7 — Cloud infrastructure, security, observability, and delivery
 
-- [ ] Author Terraform for APIs, least-privilege service accounts/IAM, Artifact Registry, private Storage, Tasks, Run, secrets, WIF, limits, cleanup, logging, and optional budget alerts.
-- [ ] Add idempotent bootstrap/deploy/configure/seed/smoke scripts and App Hosting manual fallback instructions.
-- [ ] Configure API (0–2 instances, ~512 MiB) and private worker (0–1 instances, ~1 GiB, concurrency 1–2).
-- [ ] Configure private bucket lifecycle/CORS/uniform access, low-rate OIDC Tasks retries, and image cleanup.
-- [ ] Add structured telemetry, request/task/run correlation, health/readiness, usage and quality summaries, and optional OpenTelemetry export.
-- [ ] Add secure headers/CSP/CORS/rate limits/safe errors, PII-aware logging, dependency/secret scanning, and threat documentation.
-- [ ] Add PR CI, WIF-backed main deployment, migration/openapi/docker/terraform/e2e gates, and Dependabot.
-- [ ] Use Firebase App Hosting GitHub integration as the single frontend rollout owner, with GitHub Actions as the quality gate.
+- [x] Author Terraform for APIs, least-privilege service accounts/IAM, Artifact Registry, private Storage, Tasks, Run, secrets, WIF, limits, cleanup, logging, and optional budget alerts.
+- [x] Add idempotent bootstrap/deploy/configure/seed/smoke scripts and App Hosting manual fallback instructions.
+- [x] Define API (0–2 instances, 512 MiB) and private worker (0–1 instances, 1 GiB, concurrency 1), guarded until immutable images and a Neon secret exist.
+- [x] Provision remote state, private bucket lifecycle/CORS/uniform access, low-rate OIDC Tasks retries, and image cleanup.
+- [x] Add structured telemetry, correlation, health/readiness, workspace usage/quality summaries, daily token totals, and optional OpenTelemetry export.
+- [x] Add secure headers/CSP/CORS/rate limits/safe errors, PII-aware logging, dependency/secret scanning, retention cleanup, and threat documentation.
+- [x] Add PR CI, WIF-backed main backend deployment, migration/OpenAPI/Docker/Terraform/E2E gates, actionlint validation, and Dependabot.
+- [~] Select Firebase App Hosting GitHub integration as the single frontend rollout owner; connecting it requires an approved GitHub repository remote.
 
 ## Phase 8 — Documentation, private guide, deployment, and completion audit
 
@@ -101,7 +102,7 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 - [ ] Add all 12 architecture decision records, IAM role rationale, cost caveats, deployment instructions, and operations runbook.
 - [ ] Create `../gulfdocs-private/GULFDOCS_LEARNING_GUIDE.md` from the actual implementation and verify it is untracked.
 - [ ] Install/obtain Terraform validation capability or validate through CI.
-- [x] Obtain explicit selection/approval for dedicated billing-enabled GCP project `gulfdocs` (`192591567730`).
+- [x] Obtain explicit selection/approval for the dedicated billing-enabled GCP project.
 - [~] Configure a deployed PostgreSQL service and verify Vertex AI Gemini for real-provider/database/cloud smoke tests; local adapters remain the deterministic fallback.
 - [ ] Provision and deploy only after local quality gates pass; verify privacy, OIDC delivery, scaling limits, lifecycle rules, logs, and deployed synthetic E2E flow.
 - [ ] Record real URLs, resources, test/coverage/evaluation results, costs/risks, limitations, resume bullets, and walkthrough.
@@ -109,12 +110,12 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 
 ## Blocker log
 
-| Blocker                                    | Exact impact                                                                                                | Local continuation                                                                                          |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Firebase is not yet enabled on `gulfdocs`  | Firebase Authentication and App Hosting cannot be configured until the project is registered with Firebase. | Enable Firebase during the cloud infrastructure phase after local product gates pass.                       |
-| Neon connection string not supplied        | Deployed Neon repository behavior cannot be smoke-tested.                                                   | Test against local PostgreSQL with pgvector and keep repositories database-portable.                        |
-| Gemini live configuration not yet verified | Real extraction, embeddings, Q&A, quota, latency, and cost metrics are not yet measured.                    | Use Vertex AI ADC in the selected project and retain the deterministic fake as the default evaluation path. |
-| Terraform CLI missing                      | Local `terraform fmt/validate` cannot yet run.                                                              | Author version-pinned configuration and validate in CI or after installing the CLI.                         |
+| Blocker                                    | Exact impact                                                                              | Local continuation                                                                                          |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Neon connection string not supplied        | Deployed Neon repository behavior cannot be smoke-tested.                                 | Test against local PostgreSQL with pgvector and keep repositories database-portable.                        |
+| Gemini live configuration not yet verified | Real extraction, embeddings, Q&A, quota, latency, and cost metrics are not yet measured.  | Use Vertex AI ADC in the selected project and retain the deterministic fake as the default evaluation path. |
+| GitHub remote not configured               | WIF repository binding and Firebase App Hosting's GitHub rollout cannot be activated yet. | Create a private repository now; make it public only with explicit approval.                                |
+| Google sign-in provider not configured     | Email/password works, but Google OAuth still needs Firebase provider authorization.       | Keep the implemented Google client flow and finish provider authorization with the live frontend.           |
 
 ## Verified command log
 
@@ -139,7 +140,7 @@ Only real results belong here.
 | 2026-07-30 | Authenticated upload tests | Passed: 3 PostgreSQL integration journeys covering idempotency, PDF validation, completion/queueing, and cross-workspace denial.                                                               |
 | 2026-07-30 | Backend tests (Phase 2)    | Passed: 25 tests total with strict Ruff and mypy checks; one upstream TestClient deprecation warning remains.                                                                                  |
 | 2026-07-30 | Phase 3 domain tests       | Passed: 20 document-intelligence tests covering page boundaries, bilingual detection, citations, arithmetic mismatch, injection signals, and 768-dimension embeddings.                         |
-| 2026-07-31 | Dedicated GCP selection    | Passed: `gulfdocs` / `192591567730` is active, billing-enabled, selected in gcloud, and owned by the authenticated development account.                                                        |
+| 2026-07-31 | Dedicated GCP selection    | Passed: the user-selected project is active, billing-enabled, selected in gcloud, and owned by the authenticated development account; identifiers are intentionally untracked.                 |
 | 2026-07-31 | Phase 3 complete           | Passed: 36 backend tests including persistent worker processing/replay/failure, pgvector indexing, corrections, approval, revisions, and audits; Ruff, mypy, and Alembic drift checks passed.  |
 | 2026-07-31 | Phase 4 complete           | Passed: 37 backend tests including RRF ordering, bounded context, PostgreSQL FTS/pgvector retrieval, cited answers, unsupported answers, history, and cross-workspace Q&A denial.              |
 | 2026-07-31 | Phase 5 frontend gates     | Passed: strict TypeScript, ESLint with zero warnings, Prettier, Next.js production build, 9 Vitest tests at 78.28% statements/lines and 66.49% branches, and authenticated component journeys. |
@@ -148,3 +149,8 @@ Only real results belong here.
 | 2026-07-31 | Phase 6 measured eval      | Passed: 12 fictional PDFs; fake-ai-v1 measured 100% classification, 99.07% fields, 100% recall@3/citation precision/unsupported handling, and one disclosed difficult-date failure.            |
 | 2026-07-31 | Phase 6 test gates         | Passed: 41 Python tests, 13 Vitest tests at 86.67% statements/lines and 69.44% branches, strict Ruff/mypy/TypeScript/ESLint, Prettier, and Next.js production build.                           |
 | 2026-07-31 | Phase 6 browser gates      | Passed: 5 serial Chromium journeys including fixture upload, signed-upload handshake, processing, correction, approval, audit, and simulated cross-workspace 404.                              |
+| 2026-09-08 | Phase 7 targeted backend   | Passed: 12 API/worker tests covering authenticated metrics, usage/tokens, retention purge/audit, OIDC fail-closed behavior, and existing upload/processing flows.                              |
+| 2026-09-08 | Phase 7 frontend gates     | Passed: 13 Vitest tests at 86.96% statements/lines and 70.99% branches, strict TypeScript/ESLint, formatting, production build, and 5 Chromium journeys.                                       |
+| 2026-09-08 | Security/dependency gates  | Passed: npm and Python audits show no known vulnerabilities after patched overrides; actionlint, Ruff, strict mypy, OpenAPI drift, and Terraform validation pass.                              |
+| 2026-09-08 | GCP foundation             | Passed: 42 Terraform-managed resources created and corrected to zero drift; private bucket, low-rate queue, image cleanup, secret containers, IAM, state, and log retention verified.          |
+| 2026-09-08 | Firebase Authentication    | Passed: Firebase/Web app registered; Identity Platform initialized; email/password and improved email privacy enabled. Google provider remains an explicit OAuth configuration step.           |

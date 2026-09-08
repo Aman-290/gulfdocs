@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: gulfdocs
+          POSTGRES_USER: gulfdocs
+          POSTGRES_PASSWORD: gulfdocs
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U gulfdocs -d gulfdocs"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+psycopg://gulfdocs:gulfdocs@localhost:55432/gulfdocs
+      AUTH_PROVIDER: development
+      STORAGE_PROVIDER: local
+      TASK_QUEUE_PROVIDER: inline
+      AI_PROVIDER: fake
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.9.18
+          enable-cache: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+
+      - name: Install locked dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          uv sync --all-packages --frozen
+      - name: Format, lint, and type check
+        run: |
+          pnpm format:check
+          pnpm lint
+          pnpm typecheck
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run mypy apps/api/src apps/worker/src services/document_intelligence/src services/persistence/src evaluation scripts
+      - name: Migrate and verify schema drift
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+      - name: Backend tests and coverage
+        run: uv run pytest --cov=apps/api/src --cov=apps/worker/src --cov=services/document_intelligence/src --cov-report=term-missing --cov-report=xml:coverage-backend.xml
+      - name: Frontend unit tests and coverage
+        run: pnpm --filter @gulfdocs/web test:coverage
+      - name: Production frontend build
+        run: pnpm --filter @gulfdocs/web build
+      - name: OpenAPI contract drift
+        run: uv run python scripts/export_openapi.py
+      - name: Browser tests
+        run: |
+          pnpm --filter @gulfdocs/web exec playwright install --with-deps chromium
+          pnpm --filter @gulfdocs/web test:e2e
+      - name: Build backend containers
+        run: |
+          docker build -f apps/api/Dockerfile -t gulfdocs-api:ci .
+          docker build -f apps/worker/Dockerfile -t gulfdocs-worker:ci .
+      - name: Terraform checks
+        run: |
+          terraform -chdir=infrastructure/terraform fmt -check -recursive
+          terraform -chdir=infrastructure/terraform init -backend=false -input=false
+          terraform -chdir=infrastructure/terraform validate
+      - name: Dependency vulnerability checks
+        run: |
+          pnpm audit --audit-level high
+          uv export --frozen --no-dev --no-emit-workspace --output-file .ci-requirements.txt
+          uvx pip-audit --requirement .ci-requirements.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: |
+            coverage-backend.xml
+            apps/web/coverage
+            apps/web/playwright-report
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

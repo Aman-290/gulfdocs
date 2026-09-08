@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -108,3 +108,36 @@ class AuditEventResponse(BaseModel):
     event_type: str
     safe_metadata: dict[str, Any]
     created_at: datetime
+
+
+class UsageSummary(BaseModel):
+    usage_date: date
+    uploads_used: int
+    uploads_limit: int
+    questions_used: int
+    questions_limit: int
+    generated_tokens: int
+
+
+class QualitySummary(BaseModel):
+    total_documents: int
+    failed_documents: int
+    needs_review_documents: int
+    approved_documents: int
+    failure_rate: float
+    needs_review_rate: float
+    average_processing_ms: float | None
+    median_processing_ms: float | None
+    p95_processing_ms: float | None
+
+
+class DailyTokenSummary(BaseModel):
+    date: date
+    tokens: int
+
+
+class MetricsSummary(BaseModel):
+    generated_at: datetime
+    usage: UsageSummary
+    quality: QualitySummary
+    daily_tokens: list[DailyTokenSummary]

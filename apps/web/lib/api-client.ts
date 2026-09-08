@@ -55,6 +55,30 @@ export type AuditEntry = {
   created_at: string;
 };
 
+export type MetricsSummary = {
+  generated_at: string;
+  usage: {
+    usage_date: string;
+    uploads_used: number;
+    uploads_limit: number;
+    questions_used: number;
+    questions_limit: number;
+    generated_tokens: number;
+  };
+  quality: {
+    total_documents: number;
+    failed_documents: number;
+    needs_review_documents: number;
+    approved_documents: number;
+    failure_rate: number;
+    needs_review_rate: number;
+    average_processing_ms: number | null;
+    median_processing_ms: number | null;
+    p95_processing_ms: number | null;
+  };
+  daily_tokens: Array<{ date: string; tokens: number }>;
+};
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -103,6 +127,10 @@ export class GulfDocsApi {
 
   listDocuments() {
     return this.request<DocumentRecord[]>("/api/v1/documents");
+  }
+
+  getMetrics() {
+    return this.request<MetricsSummary>("/api/v1/metrics/summary");
   }
 
   getDocument(documentId: string) {

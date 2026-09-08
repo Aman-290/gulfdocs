@@ -8,6 +8,7 @@ class WorkerSettings(BaseSettings):
 
     app_env: str = "development"
     log_level: str = "INFO"
+    otel_exporter_otlp_endpoint: str = ""
     worker_auth_mode: str = "development"
     worker_development_token: str = "local-development-only"
     worker_oidc_audience: str = ""
@@ -25,6 +26,8 @@ class WorkerSettings(BaseSettings):
     gemini_embedding_model: str = "gemini-embedding-001"
     max_processing_retries: int = 3
     max_worker_duration_seconds: int = 540
+    document_retention_days: int = 30
+    retention_cleanup_batch_size: int = 100
 
 
 @lru_cache

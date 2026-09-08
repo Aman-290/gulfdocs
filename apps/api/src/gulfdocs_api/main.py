@@ -17,7 +17,9 @@ from .logging import configure_logging
 from .middleware import request_context_middleware
 from .routes.demo import router as demo_router
 from .routes.documents import router as documents_router
+from .routes.metrics import router as metrics_router
 from .schemas import HealthResponse, ProblemDetail
+from .telemetry import configure_telemetry
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -48,6 +50,7 @@ app = FastAPI(
     description="Authorized document workflows and a bounded, synthetic public demo.",
     lifespan=lifespan,
 )
+configure_telemetry(app, settings.otel_exporter_otlp_endpoint)
 app.middleware("http")(request_context_middleware)
 app.add_middleware(
     CORSMiddleware,
@@ -60,6 +63,7 @@ app.add_middleware(
 if settings.public_demo_enabled:
     app.include_router(demo_router)
 app.include_router(documents_router)
+app.include_router(metrics_router)
 
 
 def problem_response(request: Request, status_code: int, title: str, detail: str) -> JSONResponse:

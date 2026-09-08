@@ -1343,6 +1343,11 @@ a:focus-visible {
   color: var(--muted);
   font-size: 10px;
 }
+.metric-grid span small {
+  margin-top: 3px;
+  color: #85928f;
+  font-size: 8px;
+}
 .metric-grid strong {
   color: var(--ink);
   font-size: 22px;

@@ -1,0 +1,82 @@
+name: Deploy backends
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Require deployment configuration
+        run: |
+          test -n "${PROJECT_ID}"
+          test -n "${REGION}"
+          test -n "${{ vars.GCP_WIF_PROVIDER }}"
+          test -n "${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}"
+          test -n "${{ vars.FIREBASE_APP_ORIGIN }}"
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.9.18
+      - name: Verify provisioned prerequisites
+        run: |
+          gcloud artifacts repositories describe gulfdocs --project "${PROJECT_ID}" --location "${REGION}" >/dev/null
+          gcloud secrets versions describe latest --secret gulfdocs-database-url --project "${PROJECT_ID}" >/dev/null
+          gcloud secrets versions describe latest --secret gulfdocs-upload-signing-secret --project "${PROJECT_ID}" >/dev/null
+          gcloud run services describe gulfdocs-production-api --project "${PROJECT_ID}" --region "${REGION}" >/dev/null
+          gcloud run services describe gulfdocs-production-worker --project "${PROJECT_ID}" --region "${REGION}" >/dev/null
+      - name: Build and push immutable images
+        run: |
+          API_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/gulfdocs/api:${{ github.event.workflow_run.head_sha }}"
+          WORKER_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/gulfdocs/worker:${{ github.event.workflow_run.head_sha }}"
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker build -f apps/api/Dockerfile -t "${API_IMAGE}" .
+          docker build -f apps/worker/Dockerfile -t "${WORKER_IMAGE}" .
+          docker push "${API_IMAGE}"
+          docker push "${WORKER_IMAGE}"
+          echo "API_IMAGE=${API_IMAGE}" >> "${GITHUB_ENV}"
+          echo "WORKER_IMAGE=${WORKER_IMAGE}" >> "${GITHUB_ENV}"
+      - name: Deploy immutable backend revisions
+        run: |
+          gcloud run services update gulfdocs-production-api --project "${PROJECT_ID}" --region "${REGION}" --image "${API_IMAGE}" --quiet
+          gcloud run services update gulfdocs-production-worker --project "${PROJECT_ID}" --region "${REGION}" --image "${WORKER_IMAGE}" --quiet
+          gcloud run services describe gulfdocs-production-api --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)' > api-url.txt
+      - name: Run database migrations
+        run: |
+          DATABASE_URL="$(gcloud secrets versions access latest --secret gulfdocs-database-url --project "${PROJECT_ID}")"
+          export DATABASE_URL
+          trap 'unset DATABASE_URL' EXIT
+          uv sync --all-packages --frozen
+          uv run alembic upgrade head
+      - name: Health, privacy, synthetic smoke, and logs
+        run: |
+          API_BASE_URL="$(cat api-url.txt)" infrastructure/scripts/smoke-test.sh
+          WORKER_URL="$(gcloud run services describe gulfdocs-production-worker --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')"
+          code="$(curl --silent --output /dev/null --write-out '%{http_code}' "${WORKER_URL}/healthz")"
+          test "${code}" = "403"
+          gcloud logging read 'resource.type="cloud_run_revision" AND severity>=ERROR' --project "${PROJECT_ID}" --freshness=10m --limit=20 --format=json
+      - name: Frontend rollout ownership
+        run: echo "Firebase App Hosting GitHub integration owns the frontend rollout; this workflow never deploys it."

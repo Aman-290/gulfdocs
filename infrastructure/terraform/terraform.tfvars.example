@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and supply values locally. Never commit the populated file.
+project_id  = "replace-with-dedicated-project-id"
+region      = "us-central1"
+environment = "production"
+provision_runtime = false
+
+api_image    = "us-central1-docker.pkg.dev/replace-project/gulfdocs/api:replace-sha"
+worker_image = "us-central1-docker.pkg.dev/replace-project/gulfdocs/worker:replace-sha"
+
+allowed_origins   = ["https://replace-with-app-hosting-domain.example"]
+github_repository = ""
+
+# Optional notification-only budget. Alerts do not stop spending.
+# billing_account_id = "replace-locally"
+# monthly_budget_usd = 10

@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from gulfdocs_document_intelligence.demo_data import (
     DEMO_DOCUMENT,
     DEMO_DOCUMENT_ID,
@@ -13,7 +13,13 @@ from gulfdocs_document_intelligence.models import (
     QuestionRequest,
 )
 
-router = APIRouter(prefix="/api/v1/demo", tags=["public demo"])
+from ..rate_limit import public_demo_rate_limiter
+
+router = APIRouter(
+    prefix="/api/v1/demo",
+    tags=["public demo"],
+    dependencies=[Depends(public_demo_rate_limiter)],
+)
 
 
 @router.get(

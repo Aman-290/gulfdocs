@@ -32,7 +32,7 @@ migration:
 	uv run alembic revision --autogenerate -m "$(MESSAGE)"
 
 seed:
-	@echo "Database seed command is introduced in Phase 2; Phase 1 demo data is in-memory."
+	uv run python -c 'from gulfdocs_document_intelligence.demo_data import DEMO_DOCUMENT; assert DEMO_DOCUMENT.synthetic'
 
 lint:
 	pnpm lint
@@ -90,6 +90,7 @@ terraform-fmt:
 	terraform -chdir=infrastructure/terraform fmt -check -recursive
 
 terraform-validate:
+	terraform -chdir=infrastructure/terraform init -backend=false -input=false
 	terraform -chdir=infrastructure/terraform validate
 
 smoke-local:

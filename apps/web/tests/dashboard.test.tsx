@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Dashboard } from "@/components/dashboard";
 
@@ -62,11 +62,39 @@ describe("Dashboard", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify(records), { status: 200 }),
-        ),
+      vi.fn(
+        async (input: string | URL | Request) =>
+          new Response(
+            JSON.stringify(
+              String(input).endsWith("/metrics/summary")
+                ? {
+                    generated_at: "2026-07-31T00:00:00Z",
+                    usage: {
+                      usage_date: "2026-07-31",
+                      uploads_used: 1,
+                      uploads_limit: 5,
+                      questions_used: 2,
+                      questions_limit: 20,
+                      generated_tokens: 40,
+                    },
+                    quality: {
+                      total_documents: 2,
+                      failed_documents: 0,
+                      needs_review_documents: 1,
+                      approved_documents: 1,
+                      failure_rate: 0,
+                      needs_review_rate: 0.5,
+                      average_processing_ms: 100,
+                      median_processing_ms: 100,
+                      p95_processing_ms: 120,
+                    },
+                    daily_tokens: [],
+                  }
+                : records,
+            ),
+            { status: 200 },
+          ),
+      ),
     );
   });
 
@@ -105,6 +133,11 @@ describe("Dashboard", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Choose a PDF file",
     );
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(([input]) => String(input).includes("/uploads/")),
+    ).toBe(false);
   });
 });

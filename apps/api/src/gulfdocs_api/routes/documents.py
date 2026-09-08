@@ -126,6 +126,7 @@ def _cloud_queue(settings: Settings) -> CloudTasksQueueAdapter | DevelopmentTask
                 queue=settings.cloud_tasks_queue,
                 worker_url=settings.cloud_tasks_worker_url,
                 invoker_service_account=settings.cloud_tasks_invoker_service_account,
+                oidc_audience=settings.cloud_tasks_oidc_audience,
             )
         )
     raise RuntimeError(f"Unsupported task queue provider: {settings.task_queue_provider}")
@@ -633,9 +634,7 @@ async def list_questions(document_id: UUID, context: Authorized) -> list[Private
 
 
 @router.get("/documents/{document_id}/audit", response_model=list[AuditEventResponse])
-async def list_document_audit(
-    document_id: UUID, context: Authorized
-) -> list[AuditEventResponse]:
+async def list_document_audit(document_id: UUID, context: Authorized) -> list[AuditEventResponse]:
     document = await context.session.scalar(
         select(Document.id).where(
             Document.id == document_id,
