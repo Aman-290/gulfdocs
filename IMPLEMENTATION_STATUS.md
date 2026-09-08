@@ -98,14 +98,14 @@ Status legend: `[x]` complete and verified, `[ ]` not complete, `[~]` implemente
 
 ## Phase 8 — Documentation, private guide, deployment, and completion audit
 
-- [ ] Complete recruiter README, Mermaid architecture/sequences, screenshots only when real, and all required operational/architecture documents.
-- [ ] Add all 12 architecture decision records, IAM role rationale, cost caveats, deployment instructions, and operations runbook.
-- [ ] Create `../gulfdocs-private/GULFDOCS_LEARNING_GUIDE.md` from the actual implementation and verify it is untracked.
-- [ ] Install/obtain Terraform validation capability or validate through CI.
+- [x] Complete recruiter README, Mermaid architecture/sequences, screenshots only when real, and all required operational/architecture documents.
+- [x] Add all 12 architecture decision records, IAM role rationale, cost caveats, deployment instructions, and operations runbook.
+- [x] Create `../gulfdocs-private/GULFDOCS_LEARNING_GUIDE.md` from the actual implementation and verify it is outside the repository.
+- [x] Install Terraform 1.15.8 and validate the pinned Terraform configuration locally.
 - [x] Obtain explicit selection/approval for the dedicated billing-enabled GCP project.
 - [~] Configure a deployed PostgreSQL service and verify Vertex AI Gemini for real-provider/database/cloud smoke tests; local adapters remain the deterministic fallback.
-- [ ] Provision and deploy only after local quality gates pass; verify privacy, OIDC delivery, scaling limits, lifecycle rules, logs, and deployed synthetic E2E flow.
-- [ ] Record real URLs, resources, test/coverage/evaluation results, costs/risks, limitations, resume bullets, and walkthrough.
+- [~] Provision the cloud foundation and immutable images only after local quality gates pass; runtime privacy, OIDC delivery, scaling, logs, and deployed synthetic E2E remain blocked on Neon.
+- [~] Record verified resources, test/coverage/evaluation results, costs/risks, limitations, resume bullets, and walkthrough; real URLs remain intentionally absent until smoke tests pass.
 - [ ] Confirm no secrets/private-spec files are tracked, clean Git status, and remove or convert this temporary file.
 
 ## Blocker log
@@ -154,3 +154,5 @@ Only real results belong here.
 | 2026-09-08 | Security/dependency gates  | Passed: npm and Python audits show no known vulnerabilities after patched overrides; actionlint, Ruff, strict mypy, OpenAPI drift, and Terraform validation pass.                              |
 | 2026-09-08 | GCP foundation             | Passed: 42 Terraform-managed resources created and corrected to zero drift; private bucket, low-rate queue, image cleanup, secret containers, IAM, state, and log retention verified.          |
 | 2026-09-08 | Firebase Authentication    | Passed: Firebase/Web app registered; Identity Platform initialized; email/password and improved email privacy enabled. Google provider remains an explicit OAuth configuration step.           |
+| 2026-09-08 | Immutable cloud images     | Passed: Cloud Build produced and pushed successful API and worker images to the private regional Artifact Registry repository.                                                                 |
+| 2026-09-08 | Phase 8 documentation      | Passed: recruiter README, all required technical/operational documents, 12 ADRs, and the private out-of-repository learning guide were completed; no fake URL or screenshot was published.     |

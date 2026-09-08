@@ -16,7 +16,9 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      vars.ENABLE_PRODUCTION_DEPLOY == 'true'
     runs-on: ubuntu-latest
     environment: production
     env:

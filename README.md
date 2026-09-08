@@ -2,110 +2,222 @@
 
 GulfDocs is a bilingual Arabic–English document-intelligence platform that extracts structured business data, validates financial and contractual fields, supports human review, and answers questions with page-level evidence.
 
-This repository is under active phased development. The local product path is complete through the synthetic evaluation phase: it includes PostgreSQL/pgvector persistence, Firebase and deterministic development authentication, workspace authorization, direct uploads, idempotent processing, extraction/validation/review, hybrid retrieval, grounded Q&A, an authenticated product UI, and measured fictional-data evaluation. Cloud infrastructure and deployment are tracked in [`IMPLEMENTATION_STATUS.md`](./IMPLEMENTATION_STATUS.md).
+It is designed as a production-oriented portfolio system—not a generic “chat with PDF” tutorial. The implementation includes asynchronous identifier-only jobs, schema-constrained extraction, deterministic validation, corrections and approval, hybrid PostgreSQL retrieval, citation enforcement, isolation tests, measurable evaluation, security controls, and conservative GCP infrastructure.
 
-> Public data is synthetic. Anonymous uploads are disabled. Do not use the project with confidential, personal, legally sensitive, or commercially sensitive material when it is configured with a free AI API tier.
+> Live demo: pending the production PostgreSQL secret and Firebase App Hosting repository connection. No URL is published until deployed smoke tests pass.
 
-## Live demo
+> Screenshots/video: intentionally pending a real deployed build; no mock screenshot or fake demo link is presented.
 
-Not deployed yet. Dedicated billing-enabled GCP project `gulfdocs` is selected; Firebase registration, deployed PostgreSQL, cloud resources, and rollout verification remain in the infrastructure phase.
+## Supported documents
 
-## Why this is not a basic PDF chatbot
+- Invoices
+- Quotations
+- Purchase orders
+- Short contracts (explicit text extraction only; no legal conclusions)
 
-- Asynchronous, identifier-only processing is designed for at-least-once Cloud Tasks delivery.
-- Typed extraction is followed by deterministic date, currency, arithmetic, confidence, and contract validation.
-- Reviewers will correct fields, preserve revisions, and explicitly approve records.
-- Retrieval combines PostgreSQL full-text search and pgvector under strict workspace/document filters.
-- Answers must cite retrieved pages or return an explicit unsupported result.
-- Provider, storage, authentication, queue, and repository boundaries keep local tests deterministic and cloud adapters replaceable.
+English, Arabic, and bilingual layouts are supported with RTL-aware UI. OCR and difficult-layout quality varies; see [known limitations](#known-limitations).
+
+## Capabilities
+
+- Direct signed PDF uploads with type, size, signature, page, quota, and workspace checks
+- Deterministic LangGraph processing with idempotent at-least-once delivery
+- Page-preserving PyMuPDF parsing and injection-signal detection
+- Typed extraction with explicit unavailable values, confidence, and citations
+- Arithmetic, date, currency, identifier, duplicate, confidence, and contract validation
+- Human correction history, blocking approval rules, reviews, and privacy-safe audits
+- PostgreSQL full-text + pgvector retrieval fused by reciprocal rank
+- Grounded Q&A that cites retrieved pages or returns an explicit unsupported answer
+- Authenticated usage/quality dashboard with failure/review rates and latency percentiles
+- 12 fictional evaluation PDFs and reproducible fake/Gemini opt-in evaluation
+- Firebase auth, private OIDC worker, private GCS, Secret Manager, IAM/WIF, CI/CD, retention
+
+## Why it is not a basic PDF chatbot
+
+```mermaid
+flowchart LR
+  PDF["Untrusted PDF"] --> Parse["Page-aware parsing"]
+  Parse --> Extract["Schema-constrained extraction"]
+  Extract --> Validate["Deterministic business validation"]
+  Validate --> Review["Human correction + approval"]
+  Parse --> Index["FTS + pgvector index"]
+  Index --> Ground["Bounded cited answer"]
+  Ground --> Guard{"Evidence sufficient?"}
+  Guard -->|Yes| Answer["Answer + page excerpts"]
+  Guard -->|No| Unsupported["Explicitly unsupported"]
+```
+
+The model cannot approve records, execute document instructions, access tools, or bypass workspace filters. Business rules and citation checks run outside the model.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    User["Public visitor or authenticated user"] --> Web["Firebase App Hosting · Next.js"]
-    Web --> Auth["Firebase Authentication"]
-    Web --> API["Cloud Run · FastAPI API"]
-    API --> Storage["Private Cloud Storage"]
-    API --> Tasks["Cloud Tasks · OIDC"]
-    Tasks --> Worker["Private Cloud Run worker"]
-    Worker --> Gemini["Gemini provider"]
-    API --> DB["Neon PostgreSQL · FTS + pgvector"]
-    Worker --> DB
+  User["Public visitor / reviewer"] --> Web["Firebase App Hosting · Next.js"]
+  Web --> Auth["Firebase Authentication"]
+  Web --> API["Cloud Run · FastAPI API"]
+  API --> GCS["Private Cloud Storage"]
+  API --> Tasks["Cloud Tasks · OIDC"]
+  Tasks --> Worker["Private Cloud Run worker"]
+  Worker --> Gemini["Vertex AI · Gemini"]
+  API --> DB["Neon PostgreSQL · FTS + pgvector"]
+  Worker --> DB
+  API --> Secrets["Secret Manager"]
+  Worker --> Secrets
+  API --> Logs["Cloud Logging / optional OTLP"]
+  Worker --> Logs
 ```
 
-Local development substitutes deterministic development auth, local filesystem storage, an inline task queue, a fake AI provider, and PostgreSQL with pgvector while preserving the same domain interfaces.
+Local mode swaps cloud boundaries for development auth, filesystem storage, inline Tasks, and a deterministic fake AI provider while keeping the same domain interfaces and PostgreSQL behavior.
 
-## Repository map
+## Upload sequence
 
-```text
-apps/web                         Next.js App Router frontend
-apps/api                         Public FastAPI API
-apps/worker                      Private document-processing service
-services/document_intelligence   Provider-neutral domain and local adapters
-tests                            Cross-service smoke tests
-docs                             Architecture decisions and guides
-infrastructure                   Added in the infrastructure phase
-evaluation                       Added with synthetic evaluation fixtures
-data/synthetic                   Generated fictional PDF evaluation corpus
+```mermaid
+sequenceDiagram
+  actor U as Reviewer
+  participant W as Next.js
+  participant A as FastAPI
+  participant S as Private GCS
+  participant T as Cloud Tasks
+  participant K as Private worker
+  U->>W: Select PDF
+  W->>A: Presign (Firebase token + idempotency key)
+  A-->>W: Short-lived signed PUT URL
+  W->>S: Upload PDF directly
+  W->>A: Complete upload
+  A->>S: Verify metadata, magic bytes, pages
+  A->>T: Enqueue identifiers + correlation ID
+  T->>K: OIDC POST (at least once)
+  W->>A: Bounded status polling
+  K-->>A: Persist ready / needs_review / failed
 ```
+
+## Processing sequence
+
+The worker validates identifiers, locks the document row, downloads the private object, parses pages, detects languages/security signals, classifies, selects a schema, extracts, normalizes, validates, chunks, embeds, indexes, calculates quality, and atomically finalizes. Provider/parser/prompt versions, tokens, attempts, failures, and durations are persisted. See [document pipeline](docs/document-pipeline.md).
+
+## Technology stack
+
+| Layer        | Technology                                                                                                  |
+| ------------ | ----------------------------------------------------------------------------------------------------------- |
+| Web          | Next.js App Router, strict TypeScript, React, TanStack Query, Firebase SDK, PDF.js, Vitest, Playwright      |
+| API/worker   | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, structlog, OpenTelemetry                                   |
+| Intelligence | PyMuPDF, LangGraph, google-genai, deterministic validation/provider abstraction                             |
+| Data         | Neon PostgreSQL, JSONB, full-text search, pgvector, Alembic                                                 |
+| GCP          | Firebase App Hosting/Auth, Cloud Run, Tasks, Storage, Secret Manager, Artifact Registry, Logging, Vertex AI |
+| Delivery     | Terraform, Cloud Build, GitHub Actions, WIF, Dependabot, Gitleaks                                           |
+
+## GCP service mapping and cost controls
+
+App Hosting serves the web UI at 0–1 instances. Cloud Run defines API 0–2 × 512 MiB and private worker 0–1 × 1 GiB/concurrency 1. Tasks dispatches at one request/second with one concurrent delivery and three attempts. The private bucket and database-content cleanup use 30-day retention. Artifact Registry retains five recent images; logs retain 30 days. Application limits cap PDF size/pages, daily uploads/questions, context, output tokens, retries, and runtime.
+
+This is free-tier optimized, never guaranteed free. **Budget alerts notify users but do not enforce a hard spending limit.** See [cost controls](docs/cost-controls.md).
+
+## Database, retrieval, and citations
+
+Normalized UUID/UTC tables cover identities, memberships, documents/uploads/runs/pages/chunks, extractions/fields/revisions/issues/reviews, Q&A, usage, audits, and security events. Constraints and indexes enforce legal states and idempotency. See [data model](docs/data-model.md).
+
+Retrieval ranks workspace/document-filtered full-text and 768-dimensional cosine candidates, fuses ranks with RRF, and bounds answer context. Citations are accepted only for retrieved pages and carry short excerpts. Arabic uses PostgreSQL’s `simple` configuration, so morphological recall is a known limitation. See [retrieval and citations](docs/retrieval-and-citations.md).
+
+## Evaluation
+
+Dataset `2026-07-31.1` contains 12 fictional English, Arabic, and bilingual invoices, quotations, purchase orders, and contracts, including malformed totals, missing/low-confidence fields, duplicates, multi-page tables, scanned-looking layout, difficult dates, multiple currencies, and injection text.
+
+The executed deterministic `fake-ai-v1` baseline measured 100% classification, 99.07% field extraction, 100% identifier/numeric/line-item accuracy, 94.74% normalized dates, 100% retrieval recall@3, 100% citation precision, and 100% unsupported-answer handling, with one disclosed difficult-date failure. These are regression-fixture measurements—not Gemini quality claims. See [evaluation methodology/report](docs/evaluation.md) and [latest JSON](evaluation/results/latest.json).
+
+## Security and privacy
+
+Firebase ID tokens establish identity; route and repository predicates enforce workspace membership. Storage is private/uniform-access with opaque paths. Tasks use a dedicated OIDC identity and custom audience. Secrets contain no Terraform-managed values. Logs omit documents, text, prompts/questions, tokens, URLs, and credentials. Public answers are packaged and rate-limited; anonymous uploads are rejected. CI checks dependencies, secrets, migrations, contracts, containers, Terraform, and browser behavior.
+
+Do not upload confidential, personal, legally sensitive, or commercially sensitive material to a portfolio/free-tier deployment. GulfDocs does not claim malware protection, compliance certification, perfect extraction, or guaranteed prompt-injection prevention. See [security policy](SECURITY.md).
 
 ## Local setup
 
-Prerequisites: Node.js 22+, pnpm 10+, uv, Docker, and Git. The workspace pins Python 3.12, which `uv` can install automatically.
+Prerequisites: Node.js 22+, pnpm 10.6.5, uv, Python 3.12, Docker, and Git.
 
 ```bash
 cp .env.example .env
 pnpm install --frozen-lockfile
-uv sync --all-packages
+uv sync --all-packages --frozen
 docker compose up -d postgres
 uv run alembic upgrade head
+make seed
 ```
 
-Start the services in separate terminals:
+Run in separate terminals:
 
 ```bash
-pnpm --filter @gulfdocs/web dev
-uv run uvicorn gulfdocs_api.main:app --app-dir apps/api/src --reload --port 8000
-uv run uvicorn gulfdocs_worker.main:app --app-dir apps/worker/src --reload --port 8001
+make dev-web
+make dev-api
+make dev-worker
 ```
 
-The web app is served at `http://localhost:3000`; API health is at `http://localhost:8000/healthz`. The worker requires its local bearer token even in development.
+The web app uses `http://localhost:3000`; API health is `http://localhost:8000/healthz`. Local worker calls still require the development bearer token. The Firebase Auth emulator is configured on port 9099; deterministic test auth remains isolated from production.
+
+## Environment
+
+Copy `.env.example`; never commit `.env`. Important groups are database/auth provider, storage adapter/root/bucket, queue/project/region/worker identity/audience, AI models/provider, Firebase public Web fields, CORS origin, usage limits, retention, and optional `OTEL_EXPORTER_OTLP_ENDPOINT`. Production secrets live in Secret Manager; `NEXT_PUBLIC_` values must never contain secrets.
 
 ## Quality commands
 
 ```bash
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm --filter @gulfdocs/web test:e2e
-uv run ruff check .
-uv run mypy apps/api/src apps/worker/src services/document_intelligence/src services/persistence/src evaluation
-uv run pytest -m "not integration" --cov=gulfdocs_api --cov=gulfdocs_worker --cov=gulfdocs_document_intelligence
-uv run pytest -m integration
-make eval
+make lint                 # ESLint + Ruff
+make typecheck            # strict TS + mypy
+make test                 # unit/component tests and coverage
+make test-integration     # PostgreSQL/pgvector integration
+make test-e2e             # five Chromium journeys
+make eval                 # deterministic 12-document report
+make eval-real-gemini     # requires RUN_REAL_GEMINI_EVAL=1 and credentials
+make build                # Next.js production build
+make docker-build         # non-root API and worker images
+make terraform-fmt
+make terraform-validate
+make smoke-local
+make smoke-production     # requires API_BASE_URL
 ```
 
-Equivalent Make targets are provided for Linux, macOS, and WSL workflows. Tests and evaluation reports contain only executed results; no deployment, customer, uptime, or cost claims are fabricated.
+CI also checks Alembic drift, committed OpenAPI drift, dependency advisories, Git secrets, Docker builds, Terraform, and Playwright. The latest verified frontend coverage is 86.96% statements/lines, 76.62% functions, and 70.99% branches. Backend unit-only coverage is 64%; the full database-backed suite previously covered all repository/processing paths, and the latest Phase 7 focused integration run passed 12 tests.
 
-## Measured deterministic evaluation
+## Deployment and infrastructure
 
-Dataset `2026-07-31.1` contains 12 fictional English, Arabic, and bilingual PDFs. The latest executed `fake-ai-v1` run measured 100% classification, 99.07% field extraction, 100% retrieval recall@3, 100% citation precision, and 100% unsupported-answer handling, with one disclosed difficult-date field failure. See [`docs/evaluation.md`](./docs/evaluation.md) and the full [JSON report](./evaluation/results/latest.json).
+Terraform provisions required APIs, service accounts/IAM, Artifact Registry, private GCS, Tasks, Cloud Run definitions, secret containers, optional repository-bound WIF, retention Scheduler, logging retention, and optional notification budget. A guarded foundation apply works before images/secrets; runtime is enabled only with immutable images and the real pooled Neon URL.
 
-These are deterministic fake-provider regression measurements—not Gemini quality claims. Fake-path token usage is an approximation and its USD 0 API cost means no billable model call occurred.
+Follow [deployment](docs/deployment.md), [Firebase App Hosting](docs/firebase-app-hosting.md), [IAM](docs/gcp-iam.md), and the [operations runbook](docs/operations-runbook.md). Firebase App Hosting exclusively owns frontend releases; Actions deploys backends after CI and never races it.
 
-## Firebase App Hosting
+## Architecture decisions
 
-[`apps/web/apphosting.yaml`](./apps/web/apphosting.yaml) uses the currently documented `runConfig` schema with zero minimum instances, one maximum instance, one CPU, 512 MiB memory, and conservative concurrency. The intended frontend rollout owner is Firebase App Hosting’s GitHub integration; GitHub Actions will remain the quality gate to avoid competing frontend deploy pipelines.
+The 12 ADRs in [docs/adr](docs/adr) cover App Hosting ownership and alternatives, Tasks vs Celery, Neon vs Cloud SQL, GCS, hybrid retrieval, deterministic LangGraph, Firebase Auth, Gemini abstraction, local adapters, split services, and a safe seeded demo.
 
-## Current limitations
+## Repository structure
 
-- The public demo uses seeded processed values and precomputed safe answers; it never spends Gemini quota.
-- Live Cloud Storage, Cloud Tasks, Firebase Authentication/App Hosting, and Gemini/Vertex behavior are not yet cloud-verified.
-- Deployed PostgreSQL is blocked on a Neon connection; local PostgreSQL/pgvector is fully tested.
-- Free-tier optimization does not guarantee permanently zero cost. Budget alerts notify; they do not enforce a hard spending limit.
+```text
+apps/web                         Next.js product/public demo
+apps/api                         Public authenticated FastAPI API
+apps/worker                      Private processing/retention service
+services/document_intelligence   Parsing, extraction, validation, retrieval, providers
+services/persistence             SQLAlchemy models and repositories
+migrations                       Alembic schema history
+evaluation                       Versioned fictional corpus, expected data, runner/reports
+data/synthetic                   Generated fictional PDFs
+infrastructure                   Terraform, Cloud Build, deployment scripts
+docs                             Architecture, security, operations, ADRs
+.github                          CI, backend deployment, dependency updates
+```
 
-## License
+## Known limitations
 
-[MIT](./LICENSE)
+- Production runtime is not yet deployed because a pooled Neon connection is not configured; no live URL is claimed.
+- Google sign-in needs final Firebase OAuth provider authorization; email/password and email-privacy protection are initialized.
+- Real Gemini quality, quota, latency, and price have not been measured; published metrics are fake-provider regression results.
+- PyMuPDF native extraction does not guarantee OCR for handwriting, poor/rotated/password-protected/damaged scans, complex tables, or unusual Arabic fonts.
+- Per-instance public limiting is not a distributed WAF; a higher-risk service should add a shared limiter/edge protection and malware scanning.
+- App Hosting cold starts/build behavior, Cloud Tasks OIDC delivery, and the full synthetic cloud flow must be verified after runtime deployment.
+
+## Trade-offs and roadmap
+
+Managed serverless services reduce idle operations but add cold starts and vendor coupling. Neon lowers idle database cost but crosses a cloud boundary. RRF is explainable but simple; Arabic lexical search is deliberately conservative. Deterministic graphs reduce flexibility in exchange for auditability.
+
+Next improvements: connect Neon and deploy, run real Gemini evaluation, add OCR routing and bounding-box highlights, add distributed edge rate limiting/malware scanning, improve Arabic search, and establish observed alert thresholds from real traffic.
+
+## Contributing and license
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). GulfDocs is available under the [MIT License](LICENSE). Synthetic fixtures are fictional and must remain so.
